@@ -1,6 +1,6 @@
 ================================================================================
 Permission justifications — paste into Chrome Web Store Dashboard
-OrgKit 1.7.0 (Inspector-aligned lean permissions)
+OrgKit 1.8.2 (Inspector-aligned lean permissions)
 ================================================================================
 
 cookies
@@ -9,7 +9,7 @@ Required to read the Salesforce sid cookie on Salesforce-related domains so OrgK
 
 storage
 -------
-Required to store user settings, favorites, saved SOQL library entries, UI preferences, and optional AI configuration locally in the browser profile. Session cookies are not stored in extension storage.
+Required to store user settings, favorites, saved SOQL library entries, Session Workbench continue history and scratch pad (per org key), last Org Compare A/B org-key pair, UI preferences, and optional AI configuration locally in the browser profile. Session cookies (sid) are never stored in extension storage.
 
 Host permissions
   https://*.salesforce.com/*
@@ -28,4 +28,4 @@ Only if the user enables AI assist and grants permission. Used solely for option
 
 Permissions intentionally NOT requested
 ---------------------------------------
-OrgKit does not request tabs, activeTab, or scripting. Salesforce tab context is resolved via declared Salesforce host permissions; page helpers use a declared content script; API calls use service-worker fetch with the sid cookie — matching the lean permission model of Salesforce Inspector Reloaded.
+OrgKit does not request tabs, activeTab, or scripting. Salesforce tab context for Org Compare / session detection is resolved via declared Salesforce host permissions; page helpers use a declared content script; API calls use service-worker fetch with the sid cookie — matching the lean permission model of Salesforce Inspector Reloaded.

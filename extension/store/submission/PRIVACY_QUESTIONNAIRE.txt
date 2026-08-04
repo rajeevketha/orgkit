@@ -15,7 +15,9 @@ What user data is collected?
   • Website content: Yes, limited — reads Salesforce page context / session to call APIs
     the user starts.
   • User activity: No analytics / tracking.
-  • Extension storage: settings, favorites, saved SOQL text, optional AI key (local).
+  • Extension storage: settings, favorites, saved SOQL text, Session Workbench
+    history/scratch pad (per org key), last Org Compare A/B org keys (never sid),
+    optional AI key (local).
 
 Is user data sold to third parties?
   No

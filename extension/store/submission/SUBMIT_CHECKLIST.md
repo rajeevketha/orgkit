@@ -1,13 +1,11 @@
-# OrgKit — Chrome Web Store submit checklist (v1.7.0)
-
-Use this pack end-to-end. Mirrored in Files as `OrgKit-CWS-1.7.0/`.
+# OrgKit — Chrome Web Store submit checklist (v1.8.2)
 
 ## 1. Upload package (required)
 
-- [ ] Upload **`OrgKit-1.7.0-store.zip`** (manifest at zip root)
-- [ ] Confirm version **1.7.0**
+- [ ] Upload **`OrgKit-1.8.2-store.zip`** (manifest at zip root — do **not** zip a parent folder)
+- [ ] Confirm version **1.8.2**
 - [ ] Confirm permissions: **cookies** + **storage** only (+ Salesforce hosts; OpenAI optional)
-- [ ] Confirm UI entry is `app/index.html` (not popup/popup.html)
+- [ ] Confirm UI entry is `app/index.html`
 
 ## 2. Store listing (required)
 
@@ -15,19 +13,20 @@ Use this pack end-to-end. Mirrored in Files as `OrgKit-CWS-1.7.0/`.
 - [ ] Category: **Productivity** · Language: **English (United States)**
 - [ ] Privacy policy URL: `https://rajeevketha.github.io/chromeplugins/extension/privacy.html`
 - [ ] Icon: `icons/icon-128.png`
-- [ ] Screenshots: `screenshots/*-1280x800.png`
+- [ ] Screenshots: at least one `screenshots/*-1280x800.png` (prefer 1280×800 or 640×400)
 - [ ] Optional promo: `promo/small-promo-440x280.png`, `promo/marquee-promo-1400x560.png`
 
-## 3. Permissions (required)
+## 3. Permissions / privacy (required)
 
 - [ ] Paste from `PERMISSION_JUSTIFICATIONS.txt` (cookies, storage, hosts, optional OpenAI)
 - [ ] Single purpose from `LISTING_COPY.txt`
 - [ ] Privacy practices from `PRIVACY_QUESTIONNAIRE.txt`
+- [ ] Reviewer notes: `proofs/REVIEWER_NOTES.txt` (optional but helpful)
 
-## 4. Pre-flight
+## 4. Pre-flight before “Submit for review”
 
-- [ ] Privacy URL opens in incognito
-- [ ] Load store zip / runtime zip → Session connected on Salesforce tab
-- [ ] SOQL on custom object; Describe search by label/API; Hide/Show launcher
+- [ ] Privacy URL opens in Incognito
+- [ ] Load `OrgKit-1.8.2-store.zip` unpacked locally → Session connected on a Salesforce tab
+- [ ] Workbench home loads; Org Compare lists sessions; SOQL runs; Describe works
 - [ ] Opens as `chrome-extension://…/app/index.html`
 - [ ] Submit for review

@@ -71,12 +71,15 @@
         </li>
         <li>
           <strong>Salesforce org data you request</strong> — for example SOQL results, object describes,
-          Apex class bodies, flow metadata — shown in the extension UI and optionally exported by you
-          (CSV/Excel/JSON). This data is not uploaded to OrgKit servers (there are none).
+          Apex class bodies, flow metadata, and Org Compare inventories (objects, profiles, permission sets, flows, Apex, and related metadata) between open org sessions —
+          shown in the extension UI and optionally exported by you (CSV/Excel/JSON). This data is not
+          uploaded to OrgKit servers (there are none).
         </li>
         <li>
           <strong>Settings &amp; library items</strong> — favorites, API version, UI toggles, saved SOQL
-          names/queries, optional AI settings. Stored in Chrome extension storage on your device/profile.
+          names/queries, Session Workbench continue history and scratch pad (per org key),
+          last Org Compare A/B org-key pair (never <code>sid</code>), optional AI settings.
+          Stored in Chrome extension storage on your device/profile.
           Saved SOQL never includes your session id.
         </li>
         <li>
@@ -90,7 +93,7 @@
       <h2>Permissions (why they exist)</h2>
       <ul>
         <li><strong>cookies</strong> — read Salesforce <code>sid</code> on Salesforce domains only (same session model as tools like Salesforce Inspector Reloaded).</li>
-        <li><strong>storage</strong> — settings, favorites, saved queries, optional AI key (local). Never stores <code>sid</code>.</li>
+        <li><strong>storage</strong> — settings, favorites, saved queries, workbench history/scratch pad, optional AI key (local). Never stores <code>sid</code>.</li>
         <li><strong>Host access to Salesforce domains</strong> — call Salesforce APIs and show the on-page OrgKit launcher on Salesforce pages only.</li>
         <li><strong>Optional OpenAI hosts</strong> — only after you enable AI and grant access.</li>
       </ul>
