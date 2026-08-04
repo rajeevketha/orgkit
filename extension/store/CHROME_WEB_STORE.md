@@ -1,14 +1,14 @@
-# Chrome Web Store — OrgKit 1.8.1
+# Chrome Web Store — OrgKit 1.8.2
 
 **Submission pack:** [`extension/store/submission/`](./submission/)  
-**Upload zip:** `OrgKit-1.8.1-store.zip`  
+**Upload zip:** `OrgKit-1.8.2-store.zip`  
 **Privacy:** https://rajeevketha.github.io/chromeplugins/extension/privacy.html  
 
 Start with [`submission/SUBMIT_CHECKLIST.md`](./submission/SUBMIT_CHECKLIST.md).
 
 ## Snapshot
 
-- MV3 · version **1.8.1**
+- MV3 · version **1.8.2**
 - Permissions: `cookies`, `storage` (+ Salesforce hosts; OpenAI optional)
 - UI: `app/index.html` — **Session Workbench** home + **Org Compare** (A/B cards, field diffs)
 - Custom objects searchable in Describe / SOQL / Permissions

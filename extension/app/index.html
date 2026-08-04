@@ -283,18 +283,29 @@
         <div class="compare-org-meta" id="compareMetaRight">Pick a logged-in Salesforce session</div>
       </div>
     </div>
-    <div class="row wrap" style="margin-top:10px">
-      <label class="label tight" for="compareMode">Scope</label>
-      <select id="compareMode" class="select" title="Which objects to describe">
-        <option value="custom" selected>Custom objects + CMDT</option>
-        <option value="custom-no-mdt">Custom objects only (__c)</option>
-        <option value="all">All objects (slower)</option>
-      </select>
-      <label class="check-inline">
-        <input type="checkbox" id="compareCustomFieldsOnly" />
-        Diff custom fields only
-      </label>
-      <button type="button" class="btn primary" id="runOrgCompare">Compare</button>
+    <div class="compare-categories">
+      <div class="compare-categories-head">
+        <div class="label" style="margin-top:0">What to compare</div>
+        <div class="row wrap compare-cat-presets">
+          <button type="button" class="btn" id="compareCatsCommon" title="Objects, profiles, perm sets, flows, Apex, validation rules">Common pack</button>
+          <button type="button" class="btn" id="compareCatsAll">Select all</button>
+          <button type="button" class="btn" id="compareCatsNone">Clear</button>
+        </div>
+      </div>
+      <div id="compareCategoryList" class="compare-category-list"></div>
+      <div class="row wrap" style="margin-top:8px">
+        <label class="label tight" for="compareMode">Object scope</label>
+        <select id="compareMode" class="select" title="Which objects to describe when Objects & fields is selected">
+          <option value="custom" selected>Custom objects + CMDT</option>
+          <option value="custom-no-mdt">Custom objects only (__c)</option>
+          <option value="all">All objects (slower)</option>
+        </select>
+        <label class="check-inline">
+          <input type="checkbox" id="compareCustomFieldsOnly" />
+          Diff custom fields only
+        </label>
+        <button type="button" class="btn primary" id="runOrgCompare">Compare</button>
+      </div>
     </div>
     <div class="compare-progress hidden" id="compareProgress" aria-hidden="true">
       <div class="compare-progress-track">
@@ -304,12 +315,13 @@
     </div>
     <div id="compareStatus" class="hint"></div>
     <div id="compareSummary" class="compare-summary hidden"></div>
+    <div id="compareCategoryFilter" class="compare-cat-filter hidden" role="tablist" aria-label="Filter by category"></div>
     <div id="compareTabs" class="compare-tabs hidden" role="tablist">
       <button type="button" class="compare-tab active" data-compare-tab="onlyA">Only in A</button>
       <button type="button" class="compare-tab" data-compare-tab="onlyB">Only in B</button>
       <button type="button" class="compare-tab" data-compare-tab="differ">Differ</button>
     </div>
-    <input type="search" id="compareFilter" class="input hidden" placeholder="Filter objects / fields…" style="margin-top:8px" />
+    <input type="search" id="compareFilter" class="input hidden" placeholder="Filter by name / category…" style="margin-top:8px" />
     <div class="row wrap compare-actions hidden" id="compareActions">
       <button type="button" class="btn" id="copyCompareApiNames">Copy API names</button>
       <button type="button" class="btn" id="copyComparePackageMembers">Copy package.xml members</button>

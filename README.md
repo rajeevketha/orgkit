@@ -4,7 +4,7 @@ Chrome extension for Salesforce developers — Session Workbench home plus dual-
 
 ## Version
 
-**1.8.1** — Session Workbench (1.8.0) + Org Compare UX on top.
+**1.8.2** — Session Workbench (1.8.0) + Org Compare UX on top.
 
 ## Features
 
@@ -14,18 +14,20 @@ Chrome extension for Salesforce developers — Session Workbench home plus dual-
 
 ### Org Compare
 - A/B org cards + session chooser (Set as A/B) across all Chrome windows/tabs / cookie sessions
-- Swap A↔B, progress while describing, clickable summary stats
+- **Multi-category compare:** objects/fields, profiles, permission sets, flows, Apex classes/triggers, validation rules, record types, Lightning pages, LWC
+- Common-pack presets + per-category filters in results
+- Swap A↔B, progress while fetching, clickable summary stats
 - Env-aware tab counts (Production / Sandbox labels)
-- Side-by-side field diffs + Only in A / Only in B
+- Side-by-side attribute/field diffs + Only in A / Only in B
 - Remembers last A/B pair locally by org key only (never `sid`)
-- Copy API names / `package.xml` CustomObject members
+- Copy API names / `package.xml` members (typed by category)
 
 ### Also included
 Describe Browser, Metadata Quick Open, Package.xml Builder, Inactive Flow Cleaner, NL→SOQL, Flow/Governor/Error/Log tools, Formula builder, Permission investigator, Apex review, Setup links, ID tools, favorites.
 
 ## Install (unpacked)
 
-1. Download [`extension/releases/OrgKit-1.8.1-unpacked.zip`](extension/releases/OrgKit-1.8.1-unpacked.zip) and unzip
+1. Download [`extension/releases/OrgKit-1.8.2-unpacked.zip`](extension/releases/OrgKit-1.8.2-unpacked.zip) and unzip
 2. Chrome → `chrome://extensions` → Developer mode → **Load unpacked**
 3. Open logged-in Salesforce tabs for the orgs you want to use
 4. Alt+Shift+O (or click the OrgKit icon / on-page launcher)

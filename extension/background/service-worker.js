@@ -17,7 +17,8 @@ import {
 import {
   filterGlobalObjects,
   normalizeObjectDescribe,
-  isCustomObjectName
+  isCustomObjectName,
+  defaultCompareCategoryIds
 } from "../lib/org-compare.js";
 
 chrome.runtime.onInstalled.addListener((details) => {
@@ -88,6 +89,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         apiVersion: message.apiVersion,
         maxObjects: message.maxObjects
       }),
+    fetchCompareBundle: () =>
+      fetchCompareBundle(message.tabUrl, {
+        categories: message.categories,
+        mode: message.mode,
+        apiVersion: message.apiVersion,
+        maxObjects: message.maxObjects,
+        maxRows: message.maxRows
+      }),
     searchMetadata: () => searchMetadata(message.tabUrl, message.query, message.typeId, message.apiVersion),
     listPackageTypeMembers: () =>
       listPackageTypeMembers(message.tabUrl, message.typeName, message.apiVersion),
@@ -97,13 +106,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     executeAnonymous: () => executeAnonymous(message.tabUrl, message.apex, message.apiVersion),
     fetchLatestApexDebug: () => fetchLatestApexDebug(message.tabUrl, message.apiVersion),
     getExtensionVersion: async () => ({
-      version: "1.8.1",
+      version: "1.8.2",
       hasSearchMetadata: typeof searchMetadata === "function",
       hasFlowCleaner: typeof listInactiveFlowVersions === "function",
       hasExecuteAnonymous: typeof executeAnonymous === "function",
       hasOrgLimits: typeof getOrgLimits === "function",
       hasRecordCrud: typeof updateSObject === "function",
-      hasOrgCompare: typeof fetchOrgInventory === "function",
+      hasOrgCompare: typeof fetchCompareBundle === "function",
       privacyPolicy: "privacy.html",
       metadataTypeCount: METADATA_SEARCH_TYPES.length,
       packageTypeCount: PACKAGE_TYPES.length
@@ -627,6 +636,511 @@ async function fetchOrgInventory(tabUrl, options = {}) {
     objects,
     // Convenience counts for UI
     customObjectCount: Object.values(objects).filter((o) => isCustomObjectName(o.name)).length
+  };
+}
+
+/**
+ * Multi-category Org Compare inventory (objects via describe + common metadata via SOQL/Tooling).
+ * Never returns sid.
+ */
+async function fetchCompareBundle(tabUrl, options = {}) {
+  const apiVersion = options.apiVersion || DEFAULT_API_VERSION;
+  const mode = options.mode || "custom";
+  const maxObjects = Math.min(Math.max(Number(options.maxObjects) || 200, 1), 500);
+  const maxRows = Math.min(Math.max(Number(options.maxRows) || 2000, 50), 5000);
+  const categories = Array.isArray(options.categories) && options.categories.length
+    ? [...new Set(options.categories.map(String))]
+    : defaultCompareCategoryIds();
+
+  const { org, session } = await getOrgSessionStrict(tabUrl);
+  if (!session?.sid) {
+    throw new Error("No Salesforce session cookie for that org. Open a logged-in tab for it.");
+  }
+  await ensureHostFetchAllowed(session.apiBase);
+
+  const username =
+    session.userInfo?.preferred_username ||
+    session.userInfo?.email ||
+    session.userInfo?.username ||
+    "";
+  const orgKey = session.userInfo?.organization_id || org.apiBase || org.hostname;
+  const bundle = {
+    orgKey,
+    label: `${org.envLabel}: ${org.myDomain || org.hostname}`,
+    hostname: org.hostname,
+    apiBase: session.apiBase,
+    envLabel: org.envLabel,
+    username,
+    mode,
+    categories: {},
+    objects: {},
+    objectCount: 0,
+    errors: [],
+    truncated: {},
+    categoryCounts: {}
+  };
+
+  const runNamed = async (catId, label, metadataType, attrKeys, runner) => {
+    try {
+      const result = await runner();
+      bundle.categories[catId] = {
+        id: catId,
+        label,
+        metadataType,
+        attrKeys,
+        items: result.items || {},
+        scanned: result.scanned || Object.keys(result.items || {}).length
+      };
+      bundle.categoryCounts[catId] = Object.keys(result.items || {}).length;
+      if (result.truncated) bundle.truncated[catId] = true;
+      if (Array.isArray(result.errors) && result.errors.length) {
+        bundle.errors.push(...result.errors.map((e) => ({ category: catId, ...e })));
+      }
+    } catch (e) {
+      bundle.errors.push({ category: catId, error: e.message || String(e) });
+      bundle.categories[catId] = {
+        id: catId,
+        label,
+        metadataType,
+        attrKeys,
+        items: {},
+        scanned: 0
+      };
+      bundle.categoryCounts[catId] = 0;
+    }
+  };
+
+  // Run selected categories; objects first if present, others in parallel.
+  const wantObjects = categories.includes("objects");
+  const otherCats = categories.filter((c) => c !== "objects");
+
+  if (wantObjects) {
+    try {
+      const inv = await fetchOrgInventory(tabUrl, { mode, apiVersion, maxObjects });
+      bundle.objects = inv.objects || {};
+      bundle.objectCount = inv.objectCount || 0;
+      bundle.categories.objects = {
+        id: "objects",
+        label: "Objects & fields",
+        metadataType: "CustomObject",
+        attrKeys: [],
+        items: inv.objects || {},
+        scanned: inv.scanned || 0
+      };
+      bundle.categoryCounts.objects = bundle.objectCount;
+      if (inv.truncated) bundle.truncated.objects = true;
+      if (Array.isArray(inv.errors)) {
+        for (const err of inv.errors) bundle.errors.push({ category: "objects", ...err });
+      }
+    } catch (e) {
+      bundle.errors.push({ category: "objects", error: e.message || String(e) });
+      bundle.categories.objects = {
+        id: "objects",
+        label: "Objects & fields",
+        metadataType: "CustomObject",
+        attrKeys: [],
+        items: {},
+        scanned: 0
+      };
+    }
+  }
+
+  const jobs = [];
+
+  if (otherCats.includes("profiles")) {
+    jobs.push(
+      runNamed("profiles", "Profiles", "Profile", [], async () => {
+        const q =
+          "SELECT Id, Name, LastModifiedDate FROM Profile ORDER BY Name ASC";
+        const page = await queryAllRecords(session, q, { tooling: false, apiVersion, maxRows });
+        const items = {};
+        for (const r of page.records) {
+          const name = String(r.Name || "").trim();
+          if (!name) continue;
+          items[name] = {
+            name,
+            label: name,
+            custom: !STANDARD_PROFILE_NAMES.has(name),
+            packageMember: name,
+            attrs: {
+              lastModifiedDate: shortDate(r.LastModifiedDate)
+            }
+          };
+        }
+        return { items, scanned: page.records.length, truncated: page.truncated };
+      })
+    );
+  }
+
+  if (otherCats.includes("permissionSets")) {
+    jobs.push(
+      runNamed(
+        "permissionSets",
+        "Permission sets",
+        "PermissionSet",
+        ["label", "namespace", "isCustom", "description"],
+        async () => {
+          const q =
+            "SELECT Id, Name, Label, NamespacePrefix, Description, IsCustom, LastModifiedDate FROM PermissionSet WHERE IsOwnedByProfile = false ORDER BY Name ASC";
+          const page = await queryAllRecords(session, q, { tooling: false, apiVersion, maxRows });
+          const items = {};
+          for (const r of page.records) {
+            const name = memberName(r.NamespacePrefix, r.Name);
+            if (!name) continue;
+            items[name] = {
+              name,
+              label: r.Label || r.Name || name,
+              custom: r.IsCustom !== false,
+              packageMember: name,
+              attrs: {
+                label: r.Label || "",
+                namespace: r.NamespacePrefix || "",
+                isCustom: r.IsCustom ? "yes" : "no",
+                description: String(r.Description || "").slice(0, 120),
+                lastModifiedDate: shortDate(r.LastModifiedDate)
+              }
+            };
+          }
+          return { items, scanned: page.records.length, truncated: page.truncated };
+        }
+      )
+    );
+  }
+
+  if (otherCats.includes("flows")) {
+    jobs.push(
+      runNamed(
+        "flows",
+        "Flows",
+        "Flow",
+        ["label", "processType", "triggerType", "isActive"],
+        async () => {
+          try {
+            const q =
+              "SELECT ApiName, Label, ProcessType, TriggerType, IsActive, LastModifiedDate FROM FlowDefinitionView ORDER BY ApiName ASC";
+            const page = await queryAllRecords(session, q, { tooling: false, apiVersion, maxRows });
+            const items = {};
+            for (const r of page.records) {
+              const name = String(r.ApiName || "").trim();
+              if (!name) continue;
+              items[name] = {
+                name,
+                label: r.Label || name,
+                custom: true,
+                packageMember: name,
+                attrs: {
+                  label: r.Label || "",
+                  processType: r.ProcessType || "",
+                  triggerType: r.TriggerType || "",
+                  isActive: r.IsActive ? "yes" : "no",
+                  lastModifiedDate: shortDate(r.LastModifiedDate)
+                }
+              };
+            }
+            return { items, scanned: page.records.length, truncated: page.truncated };
+          } catch {
+            // Older orgs / permissions: Tooling FlowDefinition fallback (no IsActive).
+            const q =
+              "SELECT Id, DeveloperName, MasterLabel, NamespacePrefix, LastModifiedDate FROM FlowDefinition ORDER BY DeveloperName ASC";
+            const page = await queryAllRecords(session, q, { tooling: true, apiVersion, maxRows });
+            const items = {};
+            for (const r of page.records) {
+              const name = memberName(r.NamespacePrefix, r.DeveloperName);
+              if (!name) continue;
+              items[name] = {
+                name,
+                label: r.MasterLabel || name,
+                custom: true,
+                packageMember: name,
+                attrs: {
+                  label: r.MasterLabel || "",
+                  processType: "",
+                  triggerType: "",
+                  isActive: "—",
+                  lastModifiedDate: shortDate(r.LastModifiedDate)
+                }
+              };
+            }
+            return { items, scanned: page.records.length, truncated: page.truncated };
+          }
+        }
+      )
+    );
+  }
+
+  if (otherCats.includes("apexClasses")) {
+    jobs.push(
+      runNamed(
+        "apexClasses",
+        "Apex classes",
+        "ApexClass",
+        ["namespace", "apiVersion", "status", "lengthWithoutComments"],
+        async () => {
+          const q =
+            "SELECT Id, Name, NamespacePrefix, ApiVersion, Status, LengthWithoutComments, LastModifiedDate FROM ApexClass ORDER BY Name ASC";
+          const page = await queryAllRecords(session, q, { tooling: true, apiVersion, maxRows });
+          const items = {};
+          for (const r of page.records) {
+            const name = memberName(r.NamespacePrefix, r.Name);
+            if (!name) continue;
+            items[name] = {
+              name,
+              label: r.Name || name,
+              custom: !r.NamespacePrefix,
+              packageMember: name,
+              attrs: {
+                namespace: r.NamespacePrefix || "",
+                apiVersion: r.ApiVersion != null ? String(r.ApiVersion) : "",
+                status: r.Status || "",
+                lengthWithoutComments:
+                  r.LengthWithoutComments != null ? String(r.LengthWithoutComments) : "",
+                lastModifiedDate: shortDate(r.LastModifiedDate)
+              }
+            };
+          }
+          return { items, scanned: page.records.length, truncated: page.truncated };
+        }
+      )
+    );
+  }
+
+  if (otherCats.includes("apexTriggers")) {
+    jobs.push(
+      runNamed(
+        "apexTriggers",
+        "Apex triggers",
+        "ApexTrigger",
+        ["namespace", "tableEnumOrId", "apiVersion", "status"],
+        async () => {
+          const q =
+            "SELECT Id, Name, TableEnumOrId, NamespacePrefix, ApiVersion, Status, LastModifiedDate FROM ApexTrigger ORDER BY Name ASC";
+          const page = await queryAllRecords(session, q, { tooling: true, apiVersion, maxRows });
+          const items = {};
+          for (const r of page.records) {
+            const name = memberName(r.NamespacePrefix, r.Name);
+            if (!name) continue;
+            items[name] = {
+              name,
+              label: r.Name || name,
+              custom: !r.NamespacePrefix,
+              packageMember: name,
+              attrs: {
+                namespace: r.NamespacePrefix || "",
+                tableEnumOrId: r.TableEnumOrId || "",
+                apiVersion: r.ApiVersion != null ? String(r.ApiVersion) : "",
+                status: r.Status || "",
+                lastModifiedDate: shortDate(r.LastModifiedDate)
+              }
+            };
+          }
+          return { items, scanned: page.records.length, truncated: page.truncated };
+        }
+      )
+    );
+  }
+
+  if (otherCats.includes("validationRules")) {
+    jobs.push(
+      runNamed(
+        "validationRules",
+        "Validation rules",
+        "ValidationRule",
+        ["object", "active", "errorDisplayField"],
+        async () => {
+          const q =
+            "SELECT Id, ValidationName, Active, ErrorDisplayField, EntityDefinition.QualifiedApiName, LastModifiedDate FROM ValidationRule ORDER BY EntityDefinition.QualifiedApiName ASC, ValidationName ASC";
+          const page = await queryAllRecords(session, q, { tooling: true, apiVersion, maxRows });
+          const items = {};
+          for (const r of page.records) {
+            const objectName =
+              r.EntityDefinition?.QualifiedApiName ||
+              r.EntityDefinition?.QualifiedApiName ||
+              "";
+            const rule = String(r.ValidationName || "").trim();
+            if (!rule) continue;
+            const name = objectName ? `${objectName}.${rule}` : rule;
+            items[name] = {
+              name,
+              label: name,
+              custom: true,
+              packageMember: name,
+              attrs: {
+                object: objectName || "",
+                active: r.Active ? "yes" : "no",
+                errorDisplayField: r.ErrorDisplayField || "",
+                lastModifiedDate: shortDate(r.LastModifiedDate)
+              }
+            };
+          }
+          return { items, scanned: page.records.length, truncated: page.truncated };
+        }
+      )
+    );
+  }
+
+  if (otherCats.includes("recordTypes")) {
+    jobs.push(
+      runNamed(
+        "recordTypes",
+        "Record types",
+        "RecordType",
+        ["object", "developerName", "isActive", "namespace"],
+        async () => {
+          const q =
+            "SELECT Id, Name, DeveloperName, SobjectType, IsActive, NamespacePrefix, LastModifiedDate FROM RecordType ORDER BY SobjectType ASC, DeveloperName ASC";
+          const page = await queryAllRecords(session, q, { tooling: false, apiVersion, maxRows });
+          const items = {};
+          for (const r of page.records) {
+            const objectName = String(r.SobjectType || "").trim();
+            const dev = String(r.DeveloperName || r.Name || "").trim();
+            if (!objectName || !dev) continue;
+            const name = `${objectName}.${dev}`;
+            const pkg = memberName(r.NamespacePrefix, `${objectName}.${dev}`);
+            items[name] = {
+              name,
+              label: r.Name || name,
+              custom: String(objectName).includes("__"),
+              packageMember: pkg || name,
+              attrs: {
+                object: objectName,
+                developerName: dev,
+                isActive: r.IsActive ? "yes" : "no",
+                namespace: r.NamespacePrefix || "",
+                lastModifiedDate: shortDate(r.LastModifiedDate)
+              }
+            };
+          }
+          return { items, scanned: page.records.length, truncated: page.truncated };
+        }
+      )
+    );
+  }
+
+  if (otherCats.includes("flexiPages")) {
+    jobs.push(
+      runNamed(
+        "flexiPages",
+        "Lightning pages",
+        "FlexiPage",
+        ["label", "namespace", "entityDefinitionId"],
+        async () => {
+          const q =
+            "SELECT Id, DeveloperName, MasterLabel, NamespacePrefix, EntityDefinitionId, LastModifiedDate FROM FlexiPage ORDER BY DeveloperName ASC";
+          const page = await queryAllRecords(session, q, { tooling: true, apiVersion, maxRows });
+          const items = {};
+          for (const r of page.records) {
+            const name = memberName(r.NamespacePrefix, r.DeveloperName);
+            if (!name) continue;
+            items[name] = {
+              name,
+              label: r.MasterLabel || name,
+              custom: !r.NamespacePrefix,
+              packageMember: name,
+              attrs: {
+                label: r.MasterLabel || "",
+                namespace: r.NamespacePrefix || "",
+                entityDefinitionId: r.EntityDefinitionId || "",
+                lastModifiedDate: shortDate(r.LastModifiedDate)
+              }
+            };
+          }
+          return { items, scanned: page.records.length, truncated: page.truncated };
+        }
+      )
+    );
+  }
+
+  if (otherCats.includes("lwc")) {
+    jobs.push(
+      runNamed(
+        "lwc",
+        "LWC bundles",
+        "LightningComponentBundle",
+        ["namespace", "apiVersion"],
+        async () => {
+          const q =
+            "SELECT Id, DeveloperName, NamespacePrefix, ApiVersion, LastModifiedDate FROM LightningComponentBundle ORDER BY DeveloperName ASC";
+          const page = await queryAllRecords(session, q, { tooling: true, apiVersion, maxRows });
+          const items = {};
+          for (const r of page.records) {
+            const name = memberName(r.NamespacePrefix, r.DeveloperName);
+            if (!name) continue;
+            items[name] = {
+              name,
+              label: r.DeveloperName || name,
+              custom: !r.NamespacePrefix,
+              packageMember: name,
+              attrs: {
+                namespace: r.NamespacePrefix || "",
+                apiVersion: r.ApiVersion != null ? String(r.ApiVersion) : "",
+                lastModifiedDate: shortDate(r.LastModifiedDate)
+              }
+            };
+          }
+          return { items, scanned: page.records.length, truncated: page.truncated };
+        }
+      )
+    );
+  }
+
+  await Promise.all(jobs);
+  return bundle;
+}
+
+const STANDARD_PROFILE_NAMES = new Set([
+  "System Administrator",
+  "Standard User",
+  "Read Only",
+  "Marketing User",
+  "Contract Manager",
+  "Solution Manager",
+  "Guest License User",
+  "Chatter Free User",
+  "Chatter Moderator User",
+  "Chatter External User",
+  "Minimum Access - Salesforce",
+  "Salesforce API Only System Integrations"
+]);
+
+function memberName(namespacePrefix, name) {
+  const n = String(name || "").trim();
+  if (!n) return "";
+  const ns = String(namespacePrefix || "").trim();
+  return ns ? `${ns}__${n}` : n;
+}
+
+function shortDate(value) {
+  if (!value) return "";
+  try {
+    return String(value).slice(0, 19).replace("T", " ");
+  } catch {
+    return String(value);
+  }
+}
+
+/**
+ * Paginate SOQL / Tooling query results up to maxRows.
+ * nextRecordsUrl is used as returned by Salesforce (full /services/data/... path).
+ */
+async function queryAllRecords(session, query, { tooling = false, apiVersion = DEFAULT_API_VERSION, maxRows = 2000 } = {}) {
+  const path = tooling
+    ? `/tooling/query?q=${encodeURIComponent(query)}`
+    : `/query?q=${encodeURIComponent(query)}`;
+  let data = await sfFetchUrl(restUrl(session.apiBase, path, apiVersion), session.sid);
+  const records = [...(data.records || [])];
+  let next = data.nextRecordsUrl;
+  while (next && records.length < maxRows) {
+    const url = next.startsWith("http")
+      ? next
+      : `${session.apiBase}${next.startsWith("/") ? "" : "/"}${next}`;
+    data = await sfFetchUrl(url, session.sid);
+    records.push(...(data.records || []));
+    next = data.done ? null : data.nextRecordsUrl;
+  }
+  return {
+    records: records.slice(0, maxRows),
+    truncated: records.length > maxRows || Boolean(next),
+    totalSize: data.totalSize ?? records.length
   };
 }
 

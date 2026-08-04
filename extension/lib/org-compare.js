@@ -1,5 +1,5 @@
 /**
- * Org Compare — normalize REST describe inventories and diff custom object/field schema.
+ * Org Compare — normalize REST/Tooling inventories and diff objects, profiles, permsets, and common metadata.
  * In-browser only; never touches sid.
  */
 
@@ -218,18 +218,26 @@ export function compareInventories(left, right, { customFieldsOnly = false } = {
 }
 
 /** Filter diff buckets by text needle and optional custom-only object rows. */
-export function filterCompareResults(results, { query = "", customOnly = false } = {}) {
+export function filterCompareResults(results, { query = "", customOnly = false, category = "" } = {}) {
   const q = String(query || "").trim().toLowerCase();
+  const cat = String(category || "").trim();
   const match = (text) => !q || String(text || "").toLowerCase().includes(q);
 
   const filterRow = (row) => {
+    if (cat && row.category && row.category !== cat) return false;
     if (customOnly && row.custom === false) return false;
     if (!q) return true;
-    if (match(row.object) || match(row.label)) return true;
+    if (match(row.object) || match(row.label) || match(row.categoryLabel) || match(row.category)) return true;
     if (row.apiNames?.some((n) => match(n))) return true;
+    if (row.detail) {
+      for (const v of Object.values(row.detail)) {
+        if (match(v)) return true;
+      }
+    }
     if (row.onlyA?.some((f) => match(f.name) || match(f.field?.label))) return true;
     if (row.onlyB?.some((f) => match(f.name) || match(f.field?.label))) return true;
-    if (row.differ?.some((f) => match(f.name) || match(f.left?.label) || match(f.right?.label))) return true;
+    if (row.differ?.some((f) => match(f.name) || match(f.left?.label) || match(f.right?.label) || match(f.label))) return true;
+    if (row.attrDiffs?.some((f) => match(f.label) || match(f.left) || match(f.right))) return true;
     return false;
   };
 
@@ -261,20 +269,40 @@ export function collectApiNames(rows, bucket) {
   return [...new Set(names)];
 }
 
-/** Handoff note: CustomObject members for package.xml (objects only). */
-export function toPackageMemberList(objectApiNames) {
-  const members = [...new Set((objectApiNames || []).filter(Boolean))].sort((a, b) =>
+/** Handoff note: package.xml <types> block for one metadata type. */
+export function toPackageMemberList(memberNames, metadataType = "CustomObject") {
+  const members = [...new Set((memberNames || []).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b)
   );
   if (!members.length) return "";
+  const typeName = String(metadataType || "CustomObject");
   const lines = members.map((m) => `        <members>${m}</members>`);
   return [
-    "<!-- Org Compare handoff — CustomObject members -->",
+    `<!-- Org Compare handoff — ${typeName} members -->`,
     "<types>",
     ...lines,
-    "        <name>CustomObject</name>",
+    `        <name>${typeName}</name>`,
     "</types>"
   ].join("\n");
+}
+
+/** Build package.xml types from compare rows grouped by metadataType. */
+export function toPackageTypesFromRows(rows) {
+  /** @type {Map<string, Set<string>>} */
+  const byType = new Map();
+  for (const row of rows || []) {
+    const typeName = row.metadataType || (row.category === "objects" ? "CustomObject" : "");
+    if (!typeName) continue;
+    if (!byType.has(typeName)) byType.set(typeName, new Set());
+    const member = row.packageMember || row.object;
+    if (member) byType.get(typeName).add(member);
+  }
+  const blocks = [];
+  for (const [typeName, members] of [...byType.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const xml = toPackageMemberList([...members], typeName);
+    if (xml) blocks.push(xml);
+  }
+  return blocks.join("\n");
 }
 
 export function formatFieldShort(f) {
@@ -347,4 +375,292 @@ export function fieldSideBySideRows(left, right) {
   const br = (right?.referenceTo || []).join(", ");
   push("referenceTo", ar || null, br || null);
   return rows;
+}
+
+
+/** Compare categories available in Org Compare (REST describe + Tooling/SOQL inventories). */
+export const COMPARE_CATEGORIES = [
+  {
+    id: "objects",
+    label: "Objects & fields",
+    blurb: "Custom object/field schema via REST describe",
+    metadataType: "CustomObject",
+    defaultOn: true,
+    common: true
+  },
+  {
+    id: "profiles",
+    label: "Profiles",
+    blurb: "Profile names present in each org",
+    metadataType: "Profile",
+    defaultOn: true,
+    common: true
+  },
+  {
+    id: "permissionSets",
+    label: "Permission sets",
+    blurb: "Permission set inventory (not profile-owned)",
+    metadataType: "PermissionSet",
+    defaultOn: true,
+    common: true
+  },
+  {
+    id: "flows",
+    label: "Flows",
+    blurb: "Flow definitions + active flag",
+    metadataType: "Flow",
+    defaultOn: true,
+    common: true
+  },
+  {
+    id: "apexClasses",
+    label: "Apex classes",
+    blurb: "Apex class inventory + API version/status",
+    metadataType: "ApexClass",
+    defaultOn: true,
+    common: true
+  },
+  {
+    id: "apexTriggers",
+    label: "Apex triggers",
+    blurb: "Trigger inventory + status/API version",
+    metadataType: "ApexTrigger",
+    defaultOn: false,
+    common: true
+  },
+  {
+    id: "validationRules",
+    label: "Validation rules",
+    blurb: "Object validation rules + active flag",
+    metadataType: "ValidationRule",
+    defaultOn: true,
+    common: true
+  },
+  {
+    id: "recordTypes",
+    label: "Record types",
+    blurb: "Record types by object + active flag",
+    metadataType: "RecordType",
+    defaultOn: false,
+    common: true
+  },
+  {
+    id: "flexiPages",
+    label: "Lightning pages",
+    blurb: "FlexiPage / Lightning page inventory",
+    metadataType: "FlexiPage",
+    defaultOn: false,
+    common: false
+  },
+  {
+    id: "lwc",
+    label: "LWC bundles",
+    blurb: "Lightning Web Component bundles",
+    metadataType: "LightningComponentBundle",
+    defaultOn: false,
+    common: false
+  }
+];
+
+export function getCompareCategory(id) {
+  return COMPARE_CATEGORIES.find((c) => c.id === id) || null;
+}
+
+export function defaultCompareCategoryIds() {
+  return COMPARE_CATEGORIES.filter((c) => c.defaultOn).map((c) => c.id);
+}
+
+export function commonCompareCategoryIds() {
+  return COMPARE_CATEGORIES.filter((c) => c.common).map((c) => c.id);
+}
+
+function namedAttrRows(left, right, keys) {
+  const rows = [];
+  for (const key of keys || []) {
+    const a = left?.[key];
+    const b = right?.[key];
+    const aVal = a == null || a === "" ? "—" : String(a);
+    const bVal = b == null || b === "" ? "—" : String(b);
+    if (aVal === bVal) continue;
+    rows.push({ label: key, left: aVal, right: bVal });
+  }
+  return rows;
+}
+
+function namedSignature(item, keys) {
+  return (keys || []).map((k) => `${k}=${item?.[k] ?? ""}`).join("|");
+}
+
+/**
+ * Diff one named-item category (profiles, flows, apex, etc.).
+ */
+export function compareNamedItems(leftItems, rightItems, {
+  category,
+  categoryLabel,
+  metadataType,
+  attrKeys = []
+} = {}) {
+  const aItems = leftItems || {};
+  const bItems = rightItems || {};
+  const names = new Set([...Object.keys(aItems), ...Object.keys(bItems)]);
+  const onlyA = [];
+  const onlyB = [];
+  const differ = [];
+  let same = 0;
+
+  for (const name of [...names].sort((x, y) => x.localeCompare(y))) {
+    const a = aItems[name];
+    const b = bItems[name];
+    if (a && !b) {
+      onlyA.push({
+        kind: "named",
+        category,
+        categoryLabel,
+        metadataType,
+        object: name,
+        label: a.label || name,
+        custom: a.custom !== false,
+        detail: a.attrs || {},
+        packageMember: a.packageMember || name,
+        apiNames: [name]
+      });
+      continue;
+    }
+    if (b && !a) {
+      onlyB.push({
+        kind: "named",
+        category,
+        categoryLabel,
+        metadataType,
+        object: name,
+        label: b.label || name,
+        custom: b.custom !== false,
+        detail: b.attrs || {},
+        packageMember: b.packageMember || name,
+        apiNames: [name]
+      });
+      continue;
+    }
+    const keys = attrKeys.length ? attrKeys : Object.keys({ ...(a.attrs || {}), ...(b.attrs || {}) }).sort();
+    if (namedSignature(a.attrs, keys) === namedSignature(b.attrs, keys)) {
+      same += 1;
+      continue;
+    }
+    const attrDiffs = namedAttrRows(a.attrs, b.attrs, keys);
+    differ.push({
+      kind: "named-diff",
+      category,
+      categoryLabel,
+      metadataType,
+      object: name,
+      label: a.label || b.label || name,
+      custom: !!(a.custom !== false || b.custom !== false),
+      attrDiffs,
+      left: a.attrs || {},
+      right: b.attrs || {},
+      packageMember: a.packageMember || b.packageMember || name,
+      apiNames: [name]
+    });
+  }
+
+  return { onlyA, onlyB, differ, same };
+}
+
+/**
+ * Diff full multi-category bundles from fetchCompareBundle.
+ */
+export function compareBundles(left, right, { customFieldsOnly = false, categories = null } = {}) {
+  const selected = Array.isArray(categories) && categories.length
+    ? categories
+    : Object.keys(left?.categories || right?.categories || {});
+
+  const onlyA = [];
+  const onlyB = [];
+  const differ = [];
+  let sameCount = 0;
+  const byCategory = {};
+
+  for (const catId of selected) {
+    const catDef = getCompareCategory(catId);
+    const leftCat = left?.categories?.[catId];
+    const rightCat = right?.categories?.[catId];
+    if (!leftCat && !rightCat) continue;
+
+    if (catId === "objects") {
+      const objDiff = compareInventories(
+        { objects: leftCat?.items || left?.objects || {} },
+        { objects: rightCat?.items || right?.objects || {} },
+        { customFieldsOnly }
+      );
+      const tag = (row) => ({
+        ...row,
+        category: "objects",
+        categoryLabel: catDef?.label || "Objects & fields",
+        metadataType: "CustomObject",
+        packageMember: row.object
+      });
+      const a = (objDiff.onlyA || []).map(tag);
+      const b = (objDiff.onlyB || []).map(tag);
+      const d = (objDiff.differ || []).map(tag);
+      onlyA.push(...a);
+      onlyB.push(...b);
+      differ.push(...d);
+      sameCount += objDiff.sameObjects || 0;
+      byCategory[catId] = {
+        label: catDef?.label || catId,
+        onlyA: a.length,
+        onlyB: b.length,
+        differ: d.length,
+        same: objDiff.sameObjects || 0,
+        leftCount: Object.keys(leftCat?.items || left?.objects || {}).length,
+        rightCount: Object.keys(rightCat?.items || right?.objects || {}).length
+      };
+      continue;
+    }
+
+    const named = compareNamedItems(leftCat?.items || {}, rightCat?.items || {}, {
+      category: catId,
+      categoryLabel: catDef?.label || leftCat?.label || catId,
+      metadataType: catDef?.metadataType || leftCat?.metadataType || "",
+      attrKeys: leftCat?.attrKeys || rightCat?.attrKeys || []
+    });
+    onlyA.push(...named.onlyA);
+    onlyB.push(...named.onlyB);
+    differ.push(...named.differ);
+    sameCount += named.same || 0;
+    byCategory[catId] = {
+      label: catDef?.label || catId,
+      onlyA: named.onlyA.length,
+      onlyB: named.onlyB.length,
+      differ: named.differ.length,
+      same: named.same || 0,
+      leftCount: Object.keys(leftCat?.items || {}).length,
+      rightCount: Object.keys(rightCat?.items || {}).length
+    };
+  }
+
+  // Stable sort within buckets: category then name
+  const sortRows = (rows) =>
+    [...rows].sort((a, b) => {
+      const c = String(a.category || "").localeCompare(String(b.category || ""));
+      if (c) return c;
+      return String(a.object || "").localeCompare(String(b.object || ""));
+    });
+
+  return {
+    onlyA: sortRows(onlyA),
+    onlyB: sortRows(onlyB),
+    differ: sortRows(differ),
+    sameObjects: sameCount,
+    sameCount,
+    summary: {
+      onlyA: onlyA.length,
+      onlyB: onlyB.length,
+      differ: differ.length,
+      sameObjects: sameCount,
+      leftObjects: byCategory.objects?.leftCount ?? Object.keys(left?.objects || {}).length,
+      rightObjects: byCategory.objects?.rightCount ?? Object.keys(right?.objects || {}).length,
+      byCategory
+    }
+  };
 }

@@ -70,14 +70,18 @@ import {
   activityTypeLabel
 } from "../lib/session-workbench.js";
 import {
-  compareInventories,
+  compareBundles,
   filterCompareResults,
   collectApiNames,
   toPackageMemberList,
+  toPackageTypesFromRows,
   formatFieldShort,
   fieldSideBySideRows,
   saveLastComparePair,
-  loadLastComparePair
+  loadLastComparePair,
+  COMPARE_CATEGORIES,
+  defaultCompareCategoryIds,
+  commonCompareCategoryIds
 } from "../lib/org-compare.js";
 
 const FEATURES = [
@@ -192,6 +196,8 @@ const state = {
     rightInv: null,
     raw: null,
     tab: "onlyA",
+    categoryFilter: "",
+    selectedCategories: defaultCompareCategoryIds(),
     running: false,
     progress: 0
   }
@@ -287,6 +293,7 @@ function showView(id) {
     searchApexClasses("").catch(() => {});
   }
   if (id === "org-compare") {
+    renderCompareCategoryPicker();
     loadCompareOrgs().catch(() => {});
   }
 }
@@ -552,6 +559,34 @@ function bindFeatureActions() {
   $("#compareCustomFieldsOnly")?.addEventListener("change", () => {
     if (state.orgCompare.raw) rerunOrgCompareDiff();
   });
+  $("#compareCatsCommon")?.addEventListener("click", () => {
+    state.orgCompare.selectedCategories = commonCompareCategoryIds();
+    renderCompareCategoryPicker();
+  });
+  $("#compareCatsAll")?.addEventListener("click", () => {
+    state.orgCompare.selectedCategories = COMPARE_CATEGORIES.map((c) => c.id);
+    renderCompareCategoryPicker();
+  });
+  $("#compareCatsNone")?.addEventListener("click", () => {
+    state.orgCompare.selectedCategories = [];
+    renderCompareCategoryPicker();
+  });
+  $("#compareCategoryList")?.addEventListener("change", (e) => {
+    const input = e.target.closest('input[data-compare-cat]');
+    if (!input) return;
+    const id = input.getAttribute("data-compare-cat");
+    const set = new Set(state.orgCompare.selectedCategories || []);
+    if (input.checked) set.add(id);
+    else set.delete(id);
+    state.orgCompare.selectedCategories = [...set];
+  });
+  $("#compareCategoryFilter")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-compare-category-filter]");
+    if (!btn) return;
+    state.orgCompare.categoryFilter = btn.getAttribute("data-compare-category-filter") || "";
+    renderCompareCategoryFilter();
+    renderOrgCompareResults();
+  });
   $("#copyCompareApiNames")?.addEventListener("click", onCopyCompareApiNames);
   $("#copyComparePackageMembers")?.addEventListener("click", onCopyComparePackageMembers);
   document.querySelectorAll("#compareTabs [data-compare-tab]").forEach((btn) => {
@@ -562,6 +597,7 @@ function bindFeatureActions() {
     if (!btn) return;
     setCompareTab(btn.getAttribute("data-compare-tab") || "onlyA");
   });
+  renderCompareCategoryPicker();
 }
 
 function bindUtilityActions() {
@@ -2283,6 +2319,7 @@ function onSwapCompareOrgs() {
   rightSel.value = left;
   // If either value is invalid/disabled after swap, leave as-is visually
   updateCompareOrgCards();
+  renderCompareSessionList();
   persistComparePairSelection().catch(() => {});
   if (state.orgCompare.leftInv && state.orgCompare.rightInv) {
     const tmp = state.orgCompare.leftInv;
@@ -2330,6 +2367,31 @@ function setCompareTab(tab) {
   renderOrgCompareResults();
 }
 
+function renderCompareCategoryPicker() {
+  const root = $("#compareCategoryList");
+  if (!root) return;
+  const selected = new Set(state.orgCompare.selectedCategories || defaultCompareCategoryIds());
+  root.innerHTML = COMPARE_CATEGORIES.map((cat) => {
+    const checked = selected.has(cat.id) ? "checked" : "";
+    return `<label class="compare-cat-chip">
+      <input type="checkbox" data-compare-cat="${escapeHtml(cat.id)}" ${checked} />
+      <span class="compare-cat-chip-text">
+        <strong>${escapeHtml(cat.label)}</strong>
+        <span>${escapeHtml(cat.blurb)}</span>
+      </span>
+    </label>`;
+  }).join("");
+}
+
+function selectedCompareCategories() {
+  const fromState = state.orgCompare.selectedCategories;
+  if (Array.isArray(fromState) && fromState.length) return [...fromState];
+  // Fallback to checked boxes in case state drifted
+  const boxes = [...document.querySelectorAll("#compareCategoryList input[data-compare-cat]:checked")];
+  const ids = boxes.map((b) => b.getAttribute("data-compare-cat")).filter(Boolean);
+  return ids.length ? ids : defaultCompareCategoryIds();
+}
+
 async function onRunOrgCompare() {
   const status = $("#compareStatus");
   const leftKey = $("#compareOrgLeft")?.value;
@@ -2350,15 +2412,26 @@ async function onRunOrgCompare() {
     return;
   }
 
+  const categories = selectedCompareCategories();
+  if (!categories.length) {
+    if (status) status.textContent = "Select at least one compare category (e.g. Objects, Profiles, Permission sets).";
+    return;
+  }
+  state.orgCompare.selectedCategories = categories;
+
   const mode = $("#compareMode")?.value || "custom";
   state.orgCompare.running = true;
   state.orgCompare.left = left;
   state.orgCompare.right = right;
+  state.orgCompare.categoryFilter = "";
   setCompareChromeVisible(false);
   await persistComparePairSelection();
+  const catLabels = categories
+    .map((id) => COMPARE_CATEGORIES.find((c) => c.id === id)?.label || id)
+    .join(", ");
   setCompareProgress(8, `Starting compare: ${left.envLabel || "A"} vs ${right.envLabel || "B"}…`);
   if (status) {
-    status.textContent = `Describing ${left.label} and ${right.label}…`;
+    status.textContent = `Comparing ${catLabels} on ${left.label} vs ${right.label}…`;
   }
 
   try {
@@ -2371,25 +2444,28 @@ async function onRunOrgCompare() {
       const done = (leftDone ? 1 : 0) + (rightDone ? 1 : 0);
       const pct = 15 + done * 35;
       const label = !leftDone
-        ? `Describing A (${left.envLabel || "Org A"})…`
+        ? `Fetching A (${left.envLabel || "Org A"})…`
         : !rightDone
-          ? `Describing B (${right.envLabel || "Org B"})…`
+          ? `Fetching B (${right.envLabel || "Org B"})…`
           : "Diffing inventories…";
       setCompareProgress(pct, label);
     };
 
-    const leftPromise = send("fetchOrgInventory", {
-      tabUrl: left.tabUrl,
+    const payload = {
       mode,
-      apiVersion: apiVer
+      apiVersion: apiVer,
+      categories
+    };
+    const leftPromise = send("fetchCompareBundle", {
+      tabUrl: left.tabUrl,
+      ...payload
     }).then((r) => {
       mark("left");
       return r;
     });
-    const rightPromise = send("fetchOrgInventory", {
+    const rightPromise = send("fetchCompareBundle", {
       tabUrl: right.tabUrl,
-      mode,
-      apiVersion: apiVer
+      ...payload
     }).then((r) => {
       mark("right");
       return r;
@@ -2407,14 +2483,14 @@ async function onRunOrgCompare() {
 
     const errCount =
       (leftRes.result.errors?.length || 0) + (rightRes.result.errors?.length || 0);
-    const trunc =
-      leftRes.result.truncated || rightRes.result.truncated
-        ? " Object list truncated for speed."
-        : "";
+    const truncKeys = [
+      ...Object.keys(leftRes.result.truncated || {}),
+      ...Object.keys(rightRes.result.truncated || {})
+    ];
+    const trunc = truncKeys.length ? ` Truncated: ${[...new Set(truncKeys)].join(", ")}.` : "";
+    const counts = summarizeBundleCounts(leftRes.result, rightRes.result);
     if (status) {
-      status.textContent = `Compared ${leftRes.result.objectCount} vs ${rightRes.result.objectCount} objects.${
-        errCount ? ` ${errCount} describe error(s).` : ""
-      }${trunc}`;
+      status.textContent = `Compared ${counts}.${errCount ? ` ${errCount} fetch note(s).` : ""}${trunc}`;
     }
   } catch (e) {
     hideCompareProgress();
@@ -2428,20 +2504,40 @@ async function onRunOrgCompare() {
   }
 }
 
+function summarizeBundleCounts(left, right) {
+  const ids = new Set([
+    ...Object.keys(left?.categoryCounts || {}),
+    ...Object.keys(right?.categoryCounts || {}),
+    ...Object.keys(left?.categories || {}),
+    ...Object.keys(right?.categories || {})
+  ]);
+  const parts = [];
+  for (const id of [...ids].sort()) {
+    const label = COMPARE_CATEGORIES.find((c) => c.id === id)?.label || id;
+    const a = left?.categoryCounts?.[id] ?? Object.keys(left?.categories?.[id]?.items || {}).length;
+    const b = right?.categoryCounts?.[id] ?? Object.keys(right?.categories?.[id]?.items || {}).length;
+    parts.push(`${label} ${a}/${b}`);
+  }
+  return parts.join(" · ") || "selected categories";
+}
+
 function rerunOrgCompareDiff() {
   const leftInv = state.orgCompare.leftInv;
   const rightInv = state.orgCompare.rightInv;
   if (!leftInv || !rightInv) return;
   const customFieldsOnly = !!$("#compareCustomFieldsOnly")?.checked;
-  state.orgCompare.raw = compareInventories(leftInv, rightInv, { customFieldsOnly });
+  const categories = selectedCompareCategories();
+  state.orgCompare.raw = compareBundles(leftInv, rightInv, { customFieldsOnly, categories });
   setCompareChromeVisible(true);
   renderOrgCompareSummary();
+  renderCompareCategoryFilter();
   updateCompareTabLabels();
   setCompareTab(state.orgCompare.tab || "onlyA");
 }
 
 function setCompareChromeVisible(visible) {
   $("#compareSummary")?.classList.toggle("hidden", !visible);
+  $("#compareCategoryFilter")?.classList.toggle("hidden", !visible);
   $("#compareTabs")?.classList.toggle("hidden", !visible);
   $("#compareFilter")?.classList.toggle("hidden", !visible);
   $("#compareActions")?.classList.toggle("hidden", !visible);
@@ -2479,20 +2575,54 @@ function renderOrgCompareSummary() {
   const s = raw.summary || {};
   const { a, b } = compareEnvLabels();
   const tab = state.orgCompare.tab || "onlyA";
+  const byCat = s.byCategory || {};
+  const catBits = Object.entries(byCat)
+    .map(([id, row]) => {
+      const drift = (row.onlyA || 0) + (row.onlyB || 0) + (row.differ || 0);
+      return `<div class="compare-stat compare-stat-static" title="${escapeHtml(row.label || id)}">
+        <strong>${drift}</strong>${escapeHtml(row.label || id)} drift
+      </div>`;
+    })
+    .join("");
   el.innerHTML = `
-    <button type="button" class="compare-stat ${tab === "onlyA" ? "active" : ""}" data-compare-tab="onlyA" title="Show objects only in A">
+    <button type="button" class="compare-stat ${tab === "onlyA" ? "active" : ""}" data-compare-tab="onlyA" title="Show items only in A">
       <strong>${s.onlyA ?? 0}</strong>Only in ${escapeHtml(a)}
     </button>
-    <button type="button" class="compare-stat ${tab === "onlyB" ? "active" : ""}" data-compare-tab="onlyB" title="Show objects only in B">
+    <button type="button" class="compare-stat ${tab === "onlyB" ? "active" : ""}" data-compare-tab="onlyB" title="Show items only in B">
       <strong>${s.onlyB ?? 0}</strong>Only in ${escapeHtml(b)}
     </button>
-    <button type="button" class="compare-stat ${tab === "differ" ? "active" : ""}" data-compare-tab="differ" title="Show objects with field drift">
+    <button type="button" class="compare-stat ${tab === "differ" ? "active" : ""}" data-compare-tab="differ" title="Show items that differ">
       <strong>${s.differ ?? 0}</strong>Differ
     </button>
     <div class="compare-stat compare-stat-static"><strong>${s.sameObjects ?? 0}</strong>Same</div>
-    <div class="compare-stat compare-stat-static"><strong>${s.leftObjects ?? 0}</strong>${escapeHtml(a)} objects</div>
-    <div class="compare-stat compare-stat-static"><strong>${s.rightObjects ?? 0}</strong>${escapeHtml(b)} objects</div>
+    ${catBits}
   `;
+}
+
+function renderCompareCategoryFilter() {
+  const el = $("#compareCategoryFilter");
+  const raw = state.orgCompare.raw;
+  if (!el || !raw) return;
+  const byCat = raw.summary?.byCategory || {};
+  const ids = Object.keys(byCat);
+  if (!ids.length) {
+    el.innerHTML = "";
+    el.classList.add("hidden");
+    return;
+  }
+  el.classList.remove("hidden");
+  const current = state.orgCompare.categoryFilter || "";
+  const buttons = [
+    `<button type="button" class="compare-cat-filter-btn ${!current ? "active" : ""}" data-compare-category-filter="">All categories</button>`
+  ];
+  for (const id of ids) {
+    const row = byCat[id];
+    const drift = (row.onlyA || 0) + (row.onlyB || 0) + (row.differ || 0);
+    buttons.push(
+      `<button type="button" class="compare-cat-filter-btn ${current === id ? "active" : ""}" data-compare-category-filter="${escapeHtml(id)}">${escapeHtml(row.label || id)} (${drift})</button>`
+    );
+  }
+  el.innerHTML = buttons.join("");
 }
 
 function getFilteredCompareBucket() {
@@ -2500,12 +2630,27 @@ function getFilteredCompareBucket() {
   if (!raw) return [];
   const filtered = filterCompareResults(raw, {
     query: $("#compareFilter")?.value || "",
-    customOnly: false
+    customOnly: false,
+    category: state.orgCompare.categoryFilter || ""
   });
   const tab = state.orgCompare.tab || "onlyA";
   if (tab === "onlyB") return filtered.onlyB || [];
   if (tab === "differ") return filtered.differ || [];
   return filtered.onlyA || [];
+}
+
+function compareRowCategoryBadge(row) {
+  const label = row.categoryLabel || row.category || "";
+  if (!label) return "";
+  return `<span class="compare-cat-badge">${escapeHtml(label)}</span>`;
+}
+
+function renderNamedDetail(detail) {
+  const entries = Object.entries(detail || {}).filter(([, v]) => v != null && String(v) !== "");
+  if (!entries.length) return "";
+  return `<div class="compare-named-detail">${entries
+    .map(([k, v]) => `<span><em>${escapeHtml(k)}</em> ${escapeHtml(String(v))}</span>`)
+    .join("")}</div>`;
 }
 
 function renderOrgCompareResults() {
@@ -2520,7 +2665,9 @@ function renderOrgCompareResults() {
   const { a, b } = compareEnvLabels();
   if (!rows.length) {
     root.innerHTML = `<div class="compare-empty">No differences in this bucket${
-      ($("#compareFilter")?.value || "").trim() ? " for the current filter" : ""
+      ($("#compareFilter")?.value || "").trim() || state.orgCompare.categoryFilter
+        ? " for the current filter"
+        : ""
     }.</div>`;
     return;
   }
@@ -2528,6 +2675,26 @@ function renderOrgCompareResults() {
   if (tab === "differ") {
     root.innerHTML = rows
       .map((row) => {
+        if (row.kind === "named-diff" || row.attrDiffs) {
+          const attrRows = row.attrDiffs || [];
+          return `<div class="compare-row">
+            <div class="compare-row-head">
+              ${compareRowCategoryBadge(row)}
+              <code>${escapeHtml(row.object)}</code>
+              <span class="muted">${escapeHtml(row.label || "")}</span>
+            </div>
+            <div class="compare-sbs">
+              <div class="compare-sbs-head"><span>Attribute</span><span>${escapeHtml(a)}</span><span>${escapeHtml(b)}</span></div>
+              ${attrRows
+                .map(
+                  (r) =>
+                    `<div class="compare-sbs-row compare-sbs-attr"><span>${escapeHtml(r.label)}</span><span>${escapeHtml(r.left)}</span><span>${escapeHtml(r.right)}</span></div>`
+                )
+                .join("")}
+            </div>
+          </div>`;
+        }
+
         const parts = [];
         if (row.onlyA?.length) {
           parts.push(
@@ -2576,6 +2743,7 @@ function renderOrgCompareResults() {
         }
         return `<div class="compare-row">
           <div class="compare-row-head">
+            ${compareRowCategoryBadge(row)}
             <code>${escapeHtml(row.object)}</code>
             <span class="muted">${escapeHtml(row.label || "")}</span>
           </div>
@@ -2587,42 +2755,55 @@ function renderOrgCompareResults() {
   }
 
   root.innerHTML = rows
-    .map(
-      (row) => `<div class="compare-row">
+    .map((row) => {
+      if (row.kind === "named") {
+        return `<div class="compare-row">
+          <div class="compare-row-head">
+            ${compareRowCategoryBadge(row)}
+            <code>${escapeHtml(row.object)}</code>
+            <span class="muted">${escapeHtml(row.label || "")}</span>
+          </div>
+          ${renderNamedDetail(row.detail)}
+        </div>`;
+      }
+      return `<div class="compare-row">
         <div class="compare-row-head">
+          ${compareRowCategoryBadge(row)}
           <code>${escapeHtml(row.object)}</code>
-          <span class="muted">${escapeHtml(row.label || "")} · ${row.fieldCount ?? 0} fields</span>
+          <span class="muted">${escapeHtml(row.label || "")}${
+            row.fieldCount != null ? ` · ${row.fieldCount} fields` : ""
+          }</span>
         </div>
-      </div>`
-    )
+      </div>`;
+    })
     .join("");
 }
 
 async function onCopyCompareApiNames() {
   const rows = getFilteredCompareBucket();
-  const tab = state.orgCompare.tab || "onlyA";
-  let names;
-  if (tab === "differ") names = collectApiNames(rows, "all");
-  else names = collectApiNames(rows, "objects");
+  const names = collectApiNames(rows, "all");
   if (!names.length) return;
-  await copyText(names.join("\n"));
+  await copyText(names.join("\\n"));
   const status = $("#compareStatus");
   if (status) status.textContent = `Copied ${names.length} API name(s).`;
 }
 
 async function onCopyComparePackageMembers() {
   const rows = getFilteredCompareBucket();
-  const tab = state.orgCompare.tab || "onlyA";
-  // Prefer object-level members; for Differ, include objects that have field drift.
-  const objectNames =
-    tab === "differ"
-      ? [...new Set(rows.map((r) => r.object).filter(Boolean))]
-      : collectApiNames(rows, "objects");
-  const xml = toPackageMemberList(objectNames);
-  if (!xml) return;
+  const xml = toPackageTypesFromRows(rows);
+  if (!xml) {
+    // Fallback for object-only rows
+    const objectNames = [...new Set(rows.map((r) => r.packageMember || r.object).filter(Boolean))];
+    const fallback = toPackageMemberList(objectNames, "CustomObject");
+    if (!fallback) return;
+    await copyText(fallback);
+    const status = $("#compareStatus");
+    if (status) status.textContent = `Copied package.xml members (${objectNames.length}).`;
+    return;
+  }
   await copyText(xml);
   const status = $("#compareStatus");
-  if (status) status.textContent = `Copied package.xml CustomObject member list (${objectNames.length}).`;
+  if (status) status.textContent = `Copied package.xml member list for ${rows.length} row(s).`;
 }
 
 async function onSearchMeta() {
