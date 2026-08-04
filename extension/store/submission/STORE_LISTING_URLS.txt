@@ -1,5 +1,5 @@
 ================================================================================
-OrgKit — URLs to paste in Chrome Web Store (OrgKit-branded public site)
+OrgKit — Chrome Web Store public URLs
 ================================================================================
 
 Item name
@@ -9,20 +9,36 @@ Official URL
   None
 
 Homepage URL
-  https://rajeevketha.github.io/orgcomparision/
+  https://rajeevketha.github.io/orgkit/
 
 Support URL
-  https://rajeevketha.github.io/orgcomparision/
-  (or issues: https://github.com/rajeevketha/orgcomparision/issues)
+  https://github.com/rajeevketha/orgkit/issues
 
-Privacy policy URL  (Privacy practices tab)
-  https://rajeevketha.github.io/orgcomparision/privacy.html
+Privacy policy URL
+  https://rajeevketha.github.io/orgkit/privacy.html
 
 Mature content
   Off
 
-Notes
-  - Public pages are branded OrgKit.
-  - The GitHub Pages path still includes the repo slug (orgcomparision) because that is
-    the repository name. To get https://…/orgkit/ you would rename the GitHub repo to orgkit.
-  - Do not use chromeplugins URLs in the store listing.
+================================================================================
+ONE-TIME SETUP (do this before submit — makes URLs say "orgkit")
+================================================================================
+
+1) Rename GitHub repo to orgkit
+   Open: https://github.com/rajeevketha/orgcomparision/settings
+   → Repository name → change to: orgkit → Rename
+
+2) Enable GitHub Pages
+   Open: https://github.com/rajeevketha/orgkit/settings/pages
+   → Build and deployment → Deploy from a branch
+   → Branch: main (or cursor/orgkit-org-compare-2ff7 if not merged yet)
+   → Folder: / (root)
+   → Save
+
+3) Wait 1–2 minutes, then verify in Incognito:
+   https://rajeevketha.github.io/orgkit/
+   https://rajeevketha.github.io/orgkit/privacy.html
+
+4) Paste the URLs above into the Chrome Web Store listing and Save draft.
+
+Do NOT use chromeplugins or orgcomparision in the public store listing.

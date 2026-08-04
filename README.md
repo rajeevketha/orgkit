@@ -34,12 +34,19 @@ Describe Browser, Metadata Quick Open, Package.xml Builder, Inactive Flow Cleane
 - Full listing pack: [`extension/releases/OrgKit-1.8.2-CWS-submission.zip`](extension/releases/OrgKit-1.8.2-CWS-submission.zip)
 - Listing URLs: [`extension/store/submission/STORE_LISTING_URLS.txt`](extension/store/submission/STORE_LISTING_URLS.txt)
 
+## Public site (OrgKit URLs)
+
+After renaming this GitHub repo to **orgkit** and enabling Pages:
+
+- Site: https://rajeevketha.github.io/orgkit/
+- Privacy: https://rajeevketha.github.io/orgkit/privacy.html
+
 ## Privacy
 
 - Uses open Salesforce tab / cookie sessions in the browser only
 - Never stores `sid`
-- Public site: https://rajeevketha.github.io/orgcomparision/
-- Public policy: https://rajeevketha.github.io/orgcomparision/privacy.html
+- Public site: https://rajeevketha.github.io/orgkit/
+- Public policy: https://rajeevketha.github.io/orgkit/privacy.html
 
 ## License
 
