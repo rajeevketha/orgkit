@@ -9,8 +9,10 @@
 
 ## 2. Store listing (required)
 
+- [ ] Item name: **OrgKit**
 - [ ] Paste short + detailed description from `LISTING_COPY.txt`
 - [ ] Category: **Productivity** · Language: **English (United States)**
+- [ ] Homepage / Support / Privacy URLs from `STORE_LISTING_URLS.txt` (OrgKit-branded; not orgcomparision)
 - [ ] Privacy policy URL: `https://rajeevketha.github.io/chromeplugins/extension/privacy.html`
 - [ ] Icon: `icons/icon-128.png`
 - [ ] Screenshots: at least one `screenshots/*-1280x800.png` (prefer 1280×800 or 640×400)

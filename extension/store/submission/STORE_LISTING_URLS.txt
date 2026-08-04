@@ -1,0 +1,26 @@
+================================================================================
+OrgKit — URLs to paste in Chrome Web Store (use these exact values)
+================================================================================
+
+Item name
+  OrgKit
+
+Official URL
+  None
+
+Homepage URL
+  https://github.com/rajeevketha/chromeplugins
+
+Support URL
+  https://github.com/rajeevketha/chromeplugins/issues
+
+Privacy policy URL  (Privacy practices tab)
+  https://rajeevketha.github.io/chromeplugins/extension/privacy.html
+
+Why these?
+  - Product name is OrgKit (not the internal repo name).
+  - chromeplugins GitHub repo + Pages site are already titled OrgKit and host the public privacy policy.
+  - Do NOT put "orgcomparision" in the public store listing.
+
+Mature content
+  Off

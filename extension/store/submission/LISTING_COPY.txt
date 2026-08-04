@@ -59,9 +59,22 @@ SINGLE PURPOSE
 OrgKit helps Salesforce developers work in their open org: run SOQL/Tooling queries, inspect schema/metadata (including custom objects), compare drift between two logged-in orgs, review Apex/flows, and open records — using the browser Salesforce session already available in a logged-in tab.
 
 ================================================================================
-PRIVACY POLICY URL
+PUBLIC URLS (Chrome Web Store — keep OrgKit branding)
 ================================================================================
 
-https://rajeevketha.github.io/chromeplugins/extension/privacy.html
+Homepage URL
+  https://github.com/rajeevketha/chromeplugins
 
-(Confirm this URL opens in an Incognito window before submit. If you move hosting to the orgcomparision repo Pages site, update this URL everywhere.)
+Support URL
+  https://github.com/rajeevketha/chromeplugins/issues
+
+Official URL
+  None
+
+Privacy policy URL
+  https://rajeevketha.github.io/chromeplugins/extension/privacy.html
+
+Notes
+  - Always present the product as OrgKit in the store.
+  - Do not use internal repo names (e.g. orgcomparision) in Homepage/Support.
+  - Confirm the privacy URL opens in an Incognito window before submit.

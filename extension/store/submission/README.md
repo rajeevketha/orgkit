@@ -12,6 +12,7 @@
 | Screenshots | `screenshots/*-1280x800.png` |
 | Promo | `promo/` |
 | Store icon | `icons/icon-128.png` |
+| Public URLs (Homepage / Support / Privacy) | `STORE_LISTING_URLS.txt` |
 
 Start with `SUBMIT_CHECKLIST.md`.
 
@@ -20,3 +21,4 @@ Start with `SUBMIT_CHECKLIST.md`.
 - Upload **`OrgKit-1.8.2-store.zip`** only (manifest.json at the **root** of the zip).
 - Do **not** upload the whole repo or a zip that contains a nested `extension/` folder.
 - Privacy policy must be a **public HTTPS** URL that opens in Incognito.
+- Public listing must say **OrgKit** — use URLs from `STORE_LISTING_URLS.txt` (not internal repo names).
