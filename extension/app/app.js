@@ -532,11 +532,21 @@ function bindFeatureActions() {
   $("#swapCompareOrgs")?.addEventListener("click", onSwapCompareOrgs);
   $("#compareOrgLeft")?.addEventListener("change", () => {
     updateCompareOrgCards();
+    renderCompareSessionList();
     persistComparePairSelection().catch(() => {});
   });
   $("#compareOrgRight")?.addEventListener("change", () => {
     updateCompareOrgCards();
+    renderCompareSessionList();
     persistComparePairSelection().catch(() => {});
+  });
+  $("#compareSessionList")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-assign-side]");
+    if (!btn) return;
+    const side = btn.getAttribute("data-assign-side");
+    const orgKey = btn.getAttribute("data-org-key") || "";
+    if (!orgKey || (side !== "A" && side !== "B")) return;
+    assignCompareOrg(side, orgKey);
   });
   $("#compareFilter")?.addEventListener("input", () => renderOrgCompareResults());
   $("#compareCustomFieldsOnly")?.addEventListener("change", () => {
@@ -2046,11 +2056,12 @@ async function loadCompareOrgs() {
 
   const prevLeft = leftSel.value;
   const prevRight = rightSel.value;
-  if (status) status.textContent = "Loading Salesforce sessions…";
+  if (status) status.textContent = "Scanning Salesforce tabs in all Chrome windows…";
 
   const res = await send("listSalesforceOrgs");
   if (!res.ok) {
     if (status) status.textContent = res.error || "Could not list orgs.";
+    renderCompareSessionList();
     return;
   }
 
@@ -2077,8 +2088,8 @@ async function loadCompareOrgs() {
       const opt = document.createElement("option");
       opt.value = org.orgKey;
       const sess = org.hasSession ? "" : " (no sid)";
-      const tabs = org.tabId ? "" : " · cookie";
-      opt.textContent = `${org.label}${sess}${tabs}`;
+      const loc = org.locationLabel ? ` · ${org.locationLabel}` : "";
+      opt.textContent = `${org.label}${sess}${loc}`;
       opt.disabled = !org.hasSession;
       sel.appendChild(opt);
     }
@@ -2107,16 +2118,26 @@ async function loadCompareOrgs() {
   }
 
   updateCompareOrgCards();
+  renderCompareSessionList();
   await persistComparePairSelection();
 
   const envCounts = countOrgsByEnv(orgs);
   const envBits = Object.entries(envCounts)
     .map(([env, n]) => `${env} ${n}`)
     .join(" · ");
+  const windowCount = countDistinctCompareWindows(orgs);
+  const windowBit =
+    windowCount > 1 ? ` across ${windowCount} Chrome windows` : windowCount === 1 ? " in 1 Chrome window" : "";
+  const hint = $("#compareChooserHint");
+  if (hint) {
+    hint.innerHTML = orgs.length
+      ? `Found <strong>${orgs.length}</strong> org session${orgs.length === 1 ? "" : "s"}${windowBit}. Use <strong>Set as A</strong> / <strong>Set as B</strong>, or the dropdowns below.`
+      : "No Salesforce sessions yet. Open logged-in org tabs in any Chrome window, then click <strong>Refresh sessions</strong>.";
+  }
   if (status) {
     status.textContent = orgs.length
-      ? `${orgs.length} org session${orgs.length === 1 ? "" : "s"} found${envBits ? ` (${envBits})` : ""}. Pick A and B, then Compare.`
-      : "Open logged-in Salesforce tabs for the orgs you want to compare, then refresh.";
+      ? `${orgs.length} org session${orgs.length === 1 ? "" : "s"} found${envBits ? ` (${envBits})` : ""}${windowBit}. Assign A and B, then Compare.`
+      : "Open logged-in Salesforce tabs (any Chrome window) for the orgs you want to compare, then refresh.";
   }
 }
 
@@ -2129,8 +2150,94 @@ function countOrgsByEnv(orgs) {
   return counts;
 }
 
+function countDistinctCompareWindows(orgs) {
+  const ids = new Set();
+  for (const org of orgs || []) {
+    for (const id of org.windowIds || []) {
+      if (id != null) ids.add(id);
+    }
+    if ((!org.windowIds || !org.windowIds.length) && org.windowId != null) ids.add(org.windowId);
+  }
+  return ids.size;
+}
+
 function getCompareOrgByKey(orgKey) {
   return state.orgCompare.orgs.find((o) => o.orgKey === orgKey) || null;
+}
+
+function assignCompareOrg(side, orgKey) {
+  const org = getCompareOrgByKey(orgKey);
+  if (!org?.hasSession) return;
+  const leftSel = $("#compareOrgLeft");
+  const rightSel = $("#compareOrgRight");
+  if (!leftSel || !rightSel) return;
+
+  if (side === "A") {
+    // If B already has this org, move previous A to B when possible.
+    if (rightSel.value === orgKey && leftSel.value && leftSel.value !== orgKey) {
+      rightSel.value = leftSel.value;
+    }
+    leftSel.value = orgKey;
+  } else {
+    if (leftSel.value === orgKey && rightSel.value && rightSel.value !== orgKey) {
+      leftSel.value = rightSel.value;
+    }
+    rightSel.value = orgKey;
+  }
+
+  updateCompareOrgCards();
+  renderCompareSessionList();
+  persistComparePairSelection().catch(() => {});
+  const status = $("#compareStatus");
+  if (status) {
+    const label = org.envLabel || org.label || orgKey;
+    status.textContent = `Set ${side === "A" ? "Org A" : "Org B"} → ${label}. ${
+      leftSel.value && rightSel.value && leftSel.value !== rightSel.value
+        ? "Ready to Compare."
+        : "Pick the other org next."
+    }`;
+  }
+}
+
+function renderCompareSessionList() {
+  const root = $("#compareSessionList");
+  if (!root) return;
+  const orgs = state.orgCompare.orgs || [];
+  const leftKey = $("#compareOrgLeft")?.value || "";
+  const rightKey = $("#compareOrgRight")?.value || "";
+
+  if (!orgs.length) {
+    root.innerHTML = `<div class="compare-session-empty">No sessions found yet. Open Salesforce in one or more Chrome windows, stay logged in, then refresh.</div>`;
+    return;
+  }
+
+  root.innerHTML = orgs
+    .map((org) => {
+      const isA = org.orgKey === leftKey;
+      const isB = org.orgKey === rightKey;
+      const selectedClass = isA ? "is-a" : isB ? "is-b" : "";
+      const disabled = !org.hasSession;
+      const host = org.myDomain || org.hostname || org.apiBase || "—";
+      const user = org.username || (org.hasSession ? "session ready" : "no sid cookie");
+      const loc = org.locationLabel || org.windowLabel || (org.tabId ? "Open tab" : "Cookie session");
+      const badge = isA ? "A" : isB ? "B" : org.envLabel || "Org";
+      const badgeClass = isA ? "" : isB ? "compare-org-badge-b" : "compare-org-badge-muted";
+      return `<div class="compare-session-item ${selectedClass}${disabled ? " is-disabled" : ""}" role="listitem" data-org-key="${escapeHtml(org.orgKey)}">
+        <div class="compare-session-main">
+          <span class="compare-org-badge ${badgeClass}">${escapeHtml(badge)}</span>
+          <div class="compare-session-text">
+            <div class="compare-session-title">${escapeHtml(org.label || host)}</div>
+            <div class="compare-session-meta">${escapeHtml(host)} · ${escapeHtml(user)}</div>
+            <div class="compare-session-loc">${escapeHtml(loc)}</div>
+          </div>
+        </div>
+        <div class="compare-session-actions">
+          <button type="button" class="btn ${isA ? "primary" : ""}" data-assign-side="A" data-org-key="${escapeHtml(org.orgKey)}" ${disabled ? "disabled" : ""}>Set as A</button>
+          <button type="button" class="btn ${isB ? "primary" : ""}" data-assign-side="B" data-org-key="${escapeHtml(org.orgKey)}" ${disabled ? "disabled" : ""}>Set as B</button>
+        </div>
+      </div>`;
+    })
+    .join("");
 }
 
 function updateCompareOrgCards() {
@@ -2152,8 +2259,8 @@ function renderCompareOrgCard(side, org) {
   const host = org.myDomain || org.hostname || org.apiBase || "—";
   const user = org.username || "session user";
   const sess = org.hasSession ? "session ready" : "no sid cookie";
-  const tab = org.tabId ? "open tab" : "cookie only";
-  metaEl.innerHTML = `<span>${escapeHtml(host)}</span><span>${escapeHtml(user)}</span><span>${escapeHtml(sess)} · ${escapeHtml(tab)}</span>`;
+  const loc = org.locationLabel || (org.tabId ? "open tab" : "cookie only");
+  metaEl.innerHTML = `<span>${escapeHtml(host)}</span><span>${escapeHtml(user)}</span><span>${escapeHtml(sess)}</span><span>${escapeHtml(loc)}</span>`;
 }
 
 async function persistComparePairSelection() {

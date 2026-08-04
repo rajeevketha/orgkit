@@ -13,7 +13,7 @@ Chrome extension for Salesforce developers — Session Workbench home plus dual-
 - Continue / pinned SOQL / per-org scratch pad (local storage, no `sid`)
 
 ### Org Compare
-- A/B org cards from open Salesforce tabs / cookie sessions
+- A/B org cards + session chooser (Set as A/B) across all Chrome windows/tabs / cookie sessions
 - Swap A↔B, progress while describing, clickable summary stats
 - Env-aware tab counts (Production / Sandbox labels)
 - Side-by-side field diffs + Only in A / Only in B

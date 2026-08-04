@@ -243,16 +243,30 @@
   <section id="view-org-compare" class="view">
     <p class="hint">
       Compare custom object and field inventory between two logged-in Salesforce orgs (UAT vs Prod drift).
-      Uses open tab / cookie sessions only — no passwords, and <code>sid</code> is never stored.
-      Last A/B pair is remembered locally by org key only.
+      OrgKit scans <strong>all Chrome windows</strong> in this profile for Salesforce tabs, plus cookie sessions.
+      No passwords; <code>sid</code> is never stored. Last A/B pair is remembered by org key only.
     </p>
+
+    <div class="compare-chooser">
+      <div class="compare-chooser-head">
+        <div>
+          <div class="label" style="margin-top:0">Available Salesforce sessions</div>
+          <p class="hint compare-chooser-hint" id="compareChooserHint">
+            Open the two orgs in any Chrome window/tab, then use <strong>Set as A</strong> / <strong>Set as B</strong> (or the dropdowns below).
+          </p>
+        </div>
+        <button type="button" class="btn" id="refreshCompareOrgs">Refresh sessions</button>
+      </div>
+      <div id="compareSessionList" class="compare-session-list" role="list"></div>
+    </div>
+
     <div class="compare-org-cards" id="compareOrgCards">
       <div class="compare-org-card" data-side="A">
         <div class="compare-org-card-head">
           <span class="compare-org-badge">A</span>
           <span class="compare-org-env" id="compareEnvLeft">Org A</span>
         </div>
-        <label class="label sr-only" for="compareOrgLeft">Org A</label>
+        <label class="label" for="compareOrgLeft">Select org A</label>
         <select id="compareOrgLeft" class="select block-select"></select>
         <div class="compare-org-meta" id="compareMetaLeft">Pick a logged-in Salesforce session</div>
       </div>
@@ -264,7 +278,7 @@
           <span class="compare-org-badge compare-org-badge-b">B</span>
           <span class="compare-org-env" id="compareEnvRight">Org B</span>
         </div>
-        <label class="label sr-only" for="compareOrgRight">Org B</label>
+        <label class="label" for="compareOrgRight">Select org B</label>
         <select id="compareOrgRight" class="select block-select"></select>
         <div class="compare-org-meta" id="compareMetaRight">Pick a logged-in Salesforce session</div>
       </div>
@@ -280,7 +294,6 @@
         <input type="checkbox" id="compareCustomFieldsOnly" />
         Diff custom fields only
       </label>
-      <button type="button" class="btn" id="refreshCompareOrgs">Refresh orgs</button>
       <button type="button" class="btn primary" id="runOrgCompare">Compare</button>
     </div>
     <div class="compare-progress hidden" id="compareProgress" aria-hidden="true">

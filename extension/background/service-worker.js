@@ -322,30 +322,95 @@ async function getSessionForOrg(org, { strict = false } = {}) {
 
 /**
  * List open Salesforce tabs / cookie-backed sessions for dual-org pickers.
+ * Scans tabs in every Chrome window (not just the focused one).
  * Never returns sid values — only host, labels, and a tabUrl for subsequent API calls.
  */
 async function listSalesforceOrgs() {
+  // Empty query = all tabs across all windows in this Chrome profile.
   const tabs = await chrome.tabs.query({});
   const sfTabs = (tabs || []).filter(
     (t) => t?.url && isSalesforceUrl(t.url) && !isLoginOnlyUrl(t.url)
   );
 
+  /** @type {Map<number, chrome.windows.Window>} */
+  const windowById = new Map();
+  try {
+    const windows = await chrome.windows.getAll({ populate: false, windowTypes: ["normal"] });
+    for (const w of windows || []) {
+      if (w?.id != null) windowById.set(w.id, w);
+    }
+  } catch {
+    /* windows API unavailable — still list tabs without window labels */
+  }
+
+  // Stable window numbers for UI (1-based, focused first then by id).
+  const orderedWindowIds = [...windowById.values()]
+    .sort((a, b) => {
+      if (!!b.focused !== !!a.focused) return b.focused ? 1 : -1;
+      return (a.id || 0) - (b.id || 0);
+    })
+    .map((w) => w.id);
+  const windowNumberById = new Map(orderedWindowIds.map((id, i) => [id, i + 1]));
+
   /** @type {Map<string, object>} */
   const byKey = new Map();
+
+  const mergeSources = (prevSources, nextSource) => {
+    const sources = Array.isArray(prevSources) ? [...prevSources] : [];
+    if (!nextSource) return sources;
+    const dup = sources.some(
+      (s) =>
+        s.tabId != null &&
+        nextSource.tabId != null &&
+        s.tabId === nextSource.tabId
+    );
+    if (!dup) sources.push(nextSource);
+    return sources;
+  };
 
   const upsert = (entry) => {
     const key = entry.orgKey;
     if (!key) return;
     const prev = byKey.get(key);
     if (!prev) {
-      byKey.set(key, entry);
+      byKey.set(key, {
+        ...entry,
+        sources: mergeSources([], entry.source || null),
+        tabCount: entry.tabId ? 1 : 0,
+        windowIds: entry.windowId != null ? [entry.windowId] : []
+      });
       return;
     }
-    // Prefer entries that have a session + a live tab.
-    const prevScore = (prev.hasSession ? 2 : 0) + (prev.tabId ? 1 : 0);
-    const nextScore = (entry.hasSession ? 2 : 0) + (entry.tabId ? 1 : 0);
-    if (nextScore > prevScore) byKey.set(key, { ...prev, ...entry });
-    else if (entry.tabId && !prev.tabId) byKey.set(key, { ...prev, tabId: entry.tabId, tabUrl: entry.tabUrl });
+
+    const sources = mergeSources(prev.sources, entry.source || null);
+    const windowIds = [
+      ...new Set(
+        [...(prev.windowIds || []), ...(entry.windowId != null ? [entry.windowId] : [])].filter(
+          (id) => id != null
+        )
+      )
+    ];
+    const tabCount = sources.filter((s) => s.tabId != null).length;
+
+    // Prefer entries that have a session + a live tab; keep richest metadata.
+    const prevScore = (prev.hasSession ? 2 : 0) + (prev.tabId ? 1 : 0) + (prev.windowFocused ? 0.5 : 0);
+    const nextScore =
+      (entry.hasSession ? 2 : 0) + (entry.tabId ? 1 : 0) + (entry.windowFocused ? 0.5 : 0);
+    const base = nextScore > prevScore ? { ...prev, ...entry } : { ...entry, ...prev };
+    byKey.set(key, {
+      ...base,
+      sources,
+      tabCount,
+      windowIds,
+      windowLabels: windowIds
+        .map((id) => {
+          const n = windowNumberById.get(id);
+          const focused = windowById.get(id)?.focused;
+          if (!n) return null;
+          return focused ? `Window ${n} (focused)` : `Window ${n}`;
+        })
+        .filter(Boolean)
+    });
   };
 
   for (const tab of sfTabs) {
@@ -368,10 +433,25 @@ async function listSalesforceOrgs() {
       session?.userInfo?.organization_id && session?.userInfo?.preferred_username
         ? `${org.myDomain || org.hostname} · ${username}`
         : org.myDomain || org.hostname;
+    const win = tab.windowId != null ? windowById.get(tab.windowId) : null;
+    const windowNumber = tab.windowId != null ? windowNumberById.get(tab.windowId) : null;
+    const windowLabel =
+      windowNumber != null
+        ? win?.focused
+          ? `Window ${windowNumber} (focused)`
+          : `Window ${windowNumber}`
+        : tab.windowId != null
+          ? `Window ${tab.windowId}`
+          : "Window";
     upsert({
       orgKey,
       tabId: tab.id,
       tabUrl: tab.url,
+      tabTitle: String(tab.title || "").slice(0, 120),
+      windowId: tab.windowId ?? null,
+      windowNumber: windowNumber ?? null,
+      windowFocused: !!win?.focused,
+      windowLabel,
       hostname: org.hostname,
       apiBase: session?.apiBase || org.apiBase,
       myDomain: org.myDomain,
@@ -381,7 +461,17 @@ async function listSalesforceOrgs() {
       hasSession: !!session?.sid,
       username,
       orgId,
-      label: `${org.envLabel}: ${displayName}`
+      sourceKind: "tab",
+      label: `${org.envLabel}: ${displayName}`,
+      source: {
+        kind: "tab",
+        tabId: tab.id,
+        tabUrl: tab.url,
+        tabTitle: String(tab.title || "").slice(0, 120),
+        windowId: tab.windowId ?? null,
+        windowNumber: windowNumber ?? null,
+        windowLabel
+      }
     });
   }
 
@@ -414,6 +504,11 @@ async function listSalesforceOrgs() {
         orgKey,
         tabId: null,
         tabUrl,
+        tabTitle: "",
+        windowId: null,
+        windowNumber: null,
+        windowFocused: false,
+        windowLabel: "Cookie session (no open tab)",
         hostname: org.hostname,
         apiBase: session.apiBase || org.apiBase,
         myDomain: org.myDomain,
@@ -423,17 +518,48 @@ async function listSalesforceOrgs() {
         hasSession: true,
         username,
         orgId,
-        label: `${org.envLabel}: ${org.myDomain || org.hostname}${username ? ` · ${username}` : ""} (cookie)`
+        sourceKind: "cookie",
+        label: `${org.envLabel}: ${org.myDomain || org.hostname}${username ? ` · ${username}` : ""}`,
+        source: {
+          kind: "cookie",
+          tabId: null,
+          tabUrl,
+          tabTitle: "",
+          windowId: null,
+          windowNumber: null,
+          windowLabel: "Cookie session (no open tab)"
+        }
       });
     }
   } catch {
     /* ignore cookie enumeration failures */
   }
 
-  return [...byKey.values()].sort((a, b) => {
-    if (!!b.hasSession !== !!a.hasSession) return b.hasSession ? 1 : -1;
-    return String(a.label).localeCompare(String(b.label));
-  });
+  return [...byKey.values()]
+    .map((entry) => {
+      const windowLabels =
+        entry.windowLabels ||
+        (entry.windowLabel ? [entry.windowLabel] : []).filter(Boolean);
+      const locationBit = windowLabels.length
+        ? windowLabels.join(", ")
+        : entry.sourceKind === "cookie"
+          ? "Cookie session"
+          : "Open tab";
+      const tabBit =
+        entry.tabCount > 1 ? ` · ${entry.tabCount} tabs` : entry.tabId ? " · open tab" : "";
+      return {
+        ...entry,
+        windowLabels,
+        locationLabel: `${locationBit}${tabBit}`,
+        // Keep picker label readable; location shown separately in UI.
+        label: entry.label
+      };
+    })
+    .sort((a, b) => {
+      if (!!b.hasSession !== !!a.hasSession) return b.hasSession ? 1 : -1;
+      if (!!b.windowFocused !== !!a.windowFocused) return b.windowFocused ? 1 : -1;
+      return String(a.label).localeCompare(String(b.label));
+    });
 }
 
 /**
