@@ -2256,13 +2256,19 @@ function renderCompareSessionList() {
       const host = org.myDomain || org.hostname || org.apiBase || "—";
       const user = org.username || (org.hasSession ? "session ready" : "no sid cookie");
       const loc = org.locationLabel || org.windowLabel || (org.tabId ? "Open tab" : "Cookie session");
-      const badge = isA ? "A" : isB ? "B" : org.envLabel || "Org";
-      const badgeClass = isA ? "" : isB ? "compare-org-badge-b" : "compare-org-badge-muted";
+      const envShort = shortCompareEnvLabel(org.envLabel || (org.isSandbox ? "Sandbox" : "Production"));
+      const badge = isA ? "A" : isB ? "B" : envShort;
+      const badgeClass = isA
+        ? ""
+        : isB
+          ? "compare-org-badge-b"
+          : `compare-org-badge-muted compare-org-badge-env`;
+      const title = org.label || host;
       return `<div class="compare-session-item ${selectedClass}${disabled ? " is-disabled" : ""}" role="listitem" data-org-key="${escapeHtml(org.orgKey)}">
         <div class="compare-session-main">
-          <span class="compare-org-badge ${badgeClass}">${escapeHtml(badge)}</span>
+          <span class="compare-org-badge ${badgeClass}" title="${escapeHtml(org.envLabel || envShort)}">${escapeHtml(badge)}</span>
           <div class="compare-session-text">
-            <div class="compare-session-title">${escapeHtml(org.label || host)}</div>
+            <div class="compare-session-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
             <div class="compare-session-meta">${escapeHtml(host)} · ${escapeHtml(user)}</div>
             <div class="compare-session-loc">${escapeHtml(loc)}</div>
           </div>
@@ -2274,6 +2280,16 @@ function renderCompareSessionList() {
       </div>`;
     })
     .join("");
+}
+
+function shortCompareEnvLabel(envLabel) {
+  const env = String(envLabel || "").trim().toLowerCase();
+  if (!env) return "Org";
+  if (env.startsWith("prod")) return "Prod";
+  if (env.startsWith("sand")) return "Sandbox";
+  if (env.startsWith("dev")) return "Dev";
+  if (env.startsWith("scratch")) return "Scratch";
+  return String(envLabel).slice(0, 8);
 }
 
 function updateCompareOrgCards() {
