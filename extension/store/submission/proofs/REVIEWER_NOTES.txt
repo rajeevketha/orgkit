@@ -33,7 +33,7 @@ Full-tab UI: app/index.html (legacy popup/popup.html redirects here).
 
 Privacy policy
 --------------
-https://rajeevketha.github.io/chromeplugins/extension/privacy.html
+https://rajeevketha.github.io/orgcomparision/privacy.html
 
 How to test
 -----------

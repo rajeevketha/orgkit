@@ -44,7 +44,7 @@ Privacy & permissions
 • No OrgKit backend collecting org data
 • Session id is not written to sync storage and is not sent to AI providers
 • Optional AI sends only the text you paste, to the endpoint you configure
-• Full policy: https://rajeevketha.github.io/chromeplugins/extension/privacy.html
+• Full policy: https://rajeevketha.github.io/orgcomparision/privacy.html
 
 Permissions (summary)
 • cookies — Salesforce sid on Salesforce domains only
@@ -59,22 +59,22 @@ SINGLE PURPOSE
 OrgKit helps Salesforce developers work in their open org: run SOQL/Tooling queries, inspect schema/metadata (including custom objects), compare drift between two logged-in orgs, review Apex/flows, and open records — using the browser Salesforce session already available in a logged-in tab.
 
 ================================================================================
-PUBLIC URLS (Chrome Web Store — keep OrgKit branding)
+PUBLIC URLS (Chrome Web Store — OrgKit site)
 ================================================================================
 
 Homepage URL
-  https://github.com/rajeevketha/chromeplugins
+  https://rajeevketha.github.io/orgcomparision/
 
 Support URL
-  https://github.com/rajeevketha/chromeplugins/issues
+  https://github.com/rajeevketha/orgcomparision/issues
 
 Official URL
   None
 
 Privacy policy URL
-  https://rajeevketha.github.io/chromeplugins/extension/privacy.html
+  https://rajeevketha.github.io/orgcomparision/privacy.html
 
 Notes
   - Always present the product as OrgKit in the store.
-  - Do not use internal repo names (e.g. orgcomparision) in Homepage/Support.
+  - Do not use chromeplugins URLs.
   - Confirm the privacy URL opens in an Incognito window before submit.

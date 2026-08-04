@@ -38,7 +38,8 @@ Describe Browser, Metadata Quick Open, Package.xml Builder, Inactive Flow Cleane
 
 - Uses open Salesforce tab / cookie sessions in the browser only
 - Never stores `sid`
-- Public policy: https://rajeevketha.github.io/chromeplugins/extension/privacy.html
+- Public site: https://rajeevketha.github.io/orgcomparision/
+- Public policy: https://rajeevketha.github.io/orgcomparision/privacy.html
 
 ## License
 

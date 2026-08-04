@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OrgKit — Salesforce developer toolkit</title>
+  <meta name="description" content="OrgKit is a Chrome extension for Salesforce developers: Session Workbench, Org Compare, SOQL, schema, Apex, and more. Uses your open org tab session in-browser only." />
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0b1624;
+      --card: #122033;
+      --text: #e8eef6;
+      --muted: #9bb0c7;
+      --accent: #3b82f6;
+      --border: #2a4a6b;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f7fafc;
+        --card: #ffffff;
+        --text: #15202b;
+        --muted: #4a5d73;
+        --accent: #1f6feb;
+        --border: #d7e0ea;
+      }
+    }
+    body {
+      margin: 0;
+      font: 16px/1.55 system-ui, -apple-system, Segoe UI, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(900px 420px at 10% -10%, rgba(59, 130, 246, 0.22), transparent 60%),
+        radial-gradient(700px 360px at 90% 0%, rgba(15, 118, 110, 0.18), transparent 55%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 48px 20px 64px;
+    }
+    .brand {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0 0 8px;
+    }
+    .lede {
+      color: var(--muted);
+      font-size: 18px;
+      margin: 0 0 28px;
+      max-width: 38em;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 24px;
+      margin-bottom: 16px;
+    }
+    h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+    ul {
+      margin: 0;
+      padding-left: 1.2em;
+      color: var(--muted);
+    }
+    li { margin: 4px 0; }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 650;
+    }
+    a:hover { text-decoration: underline; }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-weight: 700;
+    }
+    .btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    footer {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 class="brand">OrgKit</h1>
+    <p class="lede">
+      Salesforce developer toolkit for Chrome — Session Workbench, dual-org Org Compare,
+      SOQL, schema, Apex, and Setup utilities. Uses your open Salesforce tab session in the browser only.
+    </p>
+
+    <section class="card">
+      <h2>What you get</h2>
+      <ul>
+        <li><strong>Session Workbench</strong> — quick launch, continue, pinned SOQL, scratch pad</li>
+        <li><strong>Org Compare</strong> — objects, profiles, permission sets, flows, Apex, and more</li>
+        <li><strong>Day-to-day tools</strong> — SOQL/Tooling, Describe, metadata open, package.xml, Apex helpers</li>
+      </ul>
+      <div class="actions">
+        <a class="btn primary" href="https://chrome.google.com/webstore/detail/addepnaekmgolifoifhhmloboifelnb">Chrome Web Store</a>
+        <a class="btn" href="privacy.html">Privacy policy</a>
+        <a class="btn" href="https://github.com/rajeevketha/orgcomparision/issues">Support</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Privacy</h2>
+      <ul>
+        <li>No OrgKit backend collecting your org data</li>
+        <li>Uses the Salesforce session already open in Chrome</li>
+        <li>Never stores <code>sid</code></li>
+      </ul>
+    </section>
+
+    <footer>
+      OrgKit · in-browser Salesforce toolkit
+    </footer>
+  </main>
+</body>
+</html>

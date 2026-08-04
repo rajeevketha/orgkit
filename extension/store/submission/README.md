@@ -7,7 +7,7 @@
 | Listing copy | `LISTING_COPY.txt` |
 | Permission justifications | `PERMISSION_JUSTIFICATIONS.txt` |
 | Privacy questionnaire | `PRIVACY_QUESTIONNAIRE.txt` |
-| Privacy page (also hosted) | `privacy.html` + https://rajeevketha.github.io/chromeplugins/extension/privacy.html |
+| Privacy page (also hosted) | `privacy.html` + https://rajeevketha.github.io/orgcomparision/privacy.html |
 | Reviewer notes | `proofs/REVIEWER_NOTES.txt` |
 | Screenshots | `screenshots/*-1280x800.png` |
 | Promo | `promo/` |

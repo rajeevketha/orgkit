@@ -3,7 +3,7 @@
 **Submission pack:** [`extension/store/submission/`](./submission/)  
 **Upload zip:** [`extension/releases/OrgKit-1.8.2-store.zip`](../releases/OrgKit-1.8.2-store.zip)  
 **Full CWS bundle (zip + listing assets):** [`extension/releases/OrgKit-1.8.2-CWS-submission.zip`](../releases/OrgKit-1.8.2-CWS-submission.zip)  
-**Privacy:** https://rajeevketha.github.io/chromeplugins/extension/privacy.html  
+**Privacy:** https://rajeevketha.github.io/orgcomparision/privacy.html  
 
 Start with [`submission/SUBMIT_CHECKLIST.md`](./submission/SUBMIT_CHECKLIST.md).
 
