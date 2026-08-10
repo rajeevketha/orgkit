@@ -88,12 +88,19 @@
 
   function envInfo() {
     const host = location.hostname.toLowerCase();
+    const firstLabel = host.split(".")[0] || "";
+    const isVf = host.includes(".vf.force.com") || host.includes(".visual.force.com");
+    const isDevEd =
+      host.includes("-dev-ed.") ||
+      host.includes(".develop.") ||
+      host.includes("develop.my.salesforce.com") ||
+      host.includes("develop.lightning.force.com");
     const isSandbox =
-      host.includes(".sandbox.") ||
-      host.includes("--") ||
-      host.startsWith("cs") ||
-      host.includes("scratch");
-    const isDevEd = host.includes("-dev-ed.") || host.includes("develop.my.salesforce.com");
+      !isDevEd &&
+      (host.includes(".sandbox.") ||
+        host.includes(".scratch.") ||
+        /^cs\d+\./i.test(host) ||
+        (/--/.test(firstLabel) && !isVf));
     return {
       host,
       isSandbox,

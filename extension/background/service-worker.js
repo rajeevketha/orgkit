@@ -4,6 +4,9 @@ import {
   restUrl,
   toSalesforceApiHost,
   toSalesforceApiBase,
+  toSalesforceLightningHost,
+  apiBaseCandidatesForCookieHost,
+  sameOrgAffinity,
   DEFAULT_API_VERSION
 } from "../lib/salesforce.js";
 import { METADATA_SEARCH_TYPES } from "../lib/metadata-open.js";
@@ -274,59 +277,111 @@ async function getOrgSession(tabUrl) {
 async function getSessionForOrg(org, { strict = false } = {}) {
   if (!org) throw new Error("Missing org");
 
-  // Prefer my.salesforce.com sid for REST/Tooling. Lightning/setup sids are
-  // host-scoped and return "Session expired or invalid" against apiBase.
+  // Prefer my.salesforce.com / pod salesforce.com sid for REST/Tooling.
+  // Lightning/setup sids are host-scoped — they fail against a rewritten
+  // *.my.salesforce.com apiBase ("Session expired or invalid"). That failure
+  // is common on sandboxes where users only open Lightning tabs.
+  const apiHost = toSalesforceApiHost(org.hostname);
   const hostsToTry = unique([
-    toSalesforceApiHost(org.hostname),
+    apiHost,
     org.apiBase ? new URL(org.apiBase).hostname : null,
     org.hostname,
-    org.hostname.includes("lightning.force.com")
-      ? org.hostname
-      : toSalesforceApiHost(org.hostname).replace(".my.salesforce.com", ".lightning.force.com")
+    toSalesforceLightningHost(org.hostname),
+    toSalesforceLightningHost(apiHost)
   ]);
 
-  let sid = null;
-  let cookieHost = null;
+  /** @type {{ host: string, sid: string, rank: number }[]} */
+  const candidates = [];
+  const seenHosts = new Set();
+  const pushCandidate = (host, sid) => {
+    const h = String(host || "")
+      .replace(/^\./, "")
+      .toLowerCase();
+    if (!h || !sid || seenHosts.has(h)) return;
+    seenHosts.add(h);
+    candidates.push({ host: h, sid, rank: apiCookieRank(h) });
+  };
+
   for (const host of hostsToTry) {
     if (!host) continue;
-    const cookie = await chrome.cookies.get({ url: `https://${host}/`, name: "sid" });
-    if (cookie?.value) {
-      sid = cookie.value;
-      cookieHost = host;
-      break;
+    try {
+      const cookie = await chrome.cookies.get({ url: `https://${host}/`, name: "sid" });
+      if (cookie?.value) pushCandidate(host, cookie.value);
+    } catch {
+      /* ignore per-host cookie read failures */
     }
   }
 
-  if (!sid && !strict) {
-    // Only read sid cookies on Salesforce-related domains (never scan unrelated sites).
-    // Non-strict fallback helps single-org UX; Org Compare uses strict to avoid cross-org sid mixups.
+  // Only read sid cookies on Salesforce-related domains (never scan unrelated sites).
+  // Always prefer cookies that match this org; avoid cross-org sid mixups (sandbox vs prod).
+  try {
     const sfCookies = await listSalesforceSidCookies();
-    const ranked = [...sfCookies].sort((a, b) => apiCookieRank(b.domain) - apiCookieRank(a.domain));
-    const match = ranked[0];
-    if (match?.value) {
-      sid = match.value;
-      cookieHost = match.domain.replace(/^\./, "");
+    const ranked = [...sfCookies].sort(
+      (a, b) => apiCookieRank(b.domain) - apiCookieRank(a.domain)
+    );
+    const affinityMatches = ranked.filter((c) => sameOrgAffinity(org.hostname, c.domain));
+    for (const match of affinityMatches) {
+      if (match?.value) pushCandidate(String(match.domain || "").replace(/^\./, ""), match.value);
     }
+    // Non-strict single-org UX: if affinity found nothing, allow top Salesforce sids.
+    if (!candidates.length && !strict) {
+      for (const match of ranked.slice(0, 3)) {
+        if (match?.value) pushCandidate(String(match.domain || "").replace(/^\./, ""), match.value);
+      }
+    }
+  } catch {
+    /* ignore cookie enumeration failures */
   }
 
-  if (!sid) {
+  candidates.sort((a, b) => b.rank - a.rank);
+
+  if (!candidates.length) {
     return { sid: null, apiBase: org.apiBase, cookieHost: null, userInfo: null };
   }
 
-  const apiBase = cookieHost ? toSalesforceApiBase(cookieHost) : toSalesforceApiBase(org.apiBase || org.hostname);
-
-  let userInfo = null;
-  try {
-    userInfo = await sfFetchUrl(`${apiBase}/services/oauth2/userinfo`, sid);
-  } catch {
-    try {
-      userInfo = await sfFetchUrl(restUrl(apiBase, "/chatter/users/me"), sid);
-    } catch {
-      /* navigation-only session */
+  let bestUnvalidated = null;
+  for (const candidate of candidates) {
+    const bases = apiBaseCandidatesForCookieHost(candidate.host);
+    for (const apiBase of bases) {
+      try {
+        await ensureHostFetchAllowed(apiBase);
+      } catch {
+        /* continue — fetch error path still clarifies site access */
+      }
+      let userInfo = null;
+      try {
+        userInfo = await sfFetchUrl(`${apiBase}/services/oauth2/userinfo`, candidate.sid);
+      } catch {
+        try {
+          userInfo = await sfFetchUrl(restUrl(apiBase, "/chatter/users/me"), candidate.sid);
+        } catch {
+          if (!bestUnvalidated) {
+            bestUnvalidated = {
+              sid: candidate.sid,
+              apiBase,
+              cookieHost: candidate.host,
+              userInfo: null
+            };
+          }
+          continue;
+        }
+      }
+      return {
+        sid: candidate.sid,
+        apiBase,
+        cookieHost: candidate.host,
+        userInfo
+      };
     }
   }
 
-  return { sid, apiBase, cookieHost, userInfo };
+  // Prefer a host-matched unvalidated cookie (navigation-only) over claiming no session.
+  // Never keep a Lightning sid paired only with a failed my.salesforce rewrite — candidates
+  // already tried Lightning apiBase first for Lightning cookies.
+  if (bestUnvalidated && sameOrgAffinity(org.hostname, bestUnvalidated.cookieHost)) {
+    return bestUnvalidated;
+  }
+  return { sid: null, apiBase: org.apiBase, cookieHost: null, userInfo: null };
 }
 
 /**
@@ -489,7 +544,8 @@ async function listSalesforceOrgs() {
     const cookies = await listSalesforceSidCookies();
     for (const c of cookies) {
       const domain = String(c.domain || "").replace(/^\./, "").toLowerCase();
-      if (!domain || apiCookieRank(domain) < 2) continue;
+      // Include Lightning cookie sessions (rank 1) — sandboxes often have only those.
+      if (!domain || apiCookieRank(domain) < 1) continue;
       const apiBase = toSalesforceApiBase(domain);
       const tabUrl = `${apiBase}/`;
       const org = parseOrgFromUrl(tabUrl);
@@ -1158,8 +1214,10 @@ function apiCookieRank(domain) {
   const d = String(domain || "").replace(/^\./, "").toLowerCase();
   if (d.endsWith(".my.salesforce.com")) return 3;
   if (d.endsWith(".salesforce.com") && !d.includes("setup")) return 2;
-  if (d.endsWith(".lightning.force.com") || d.endsWith(".salesforce-setup.com")) return 0;
-  return 1;
+  // Lightning sid is usable when apiBase stays on the Lightning host (sandbox UX).
+  if (d.endsWith(".lightning.force.com")) return 1;
+  if (d.endsWith(".salesforce-setup.com")) return 0;
+  return 0;
 }
 
 /**
