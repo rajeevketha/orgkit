@@ -47,8 +47,8 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 /** Toolbar icon / Alt+Shift+O → open OrgKit in a full tab (not a tiny popup). */
-chrome.action.onClicked.addListener(() => {
-  openOrgKitTab().catch(() => {});
+chrome.action.onClicked.addListener((tab) => {
+  openOrgKitTab(undefined, tab).catch(() => {});
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -83,7 +83,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       await chrome.tabs.create({ url: message.url });
       return { ok: true };
     },
-    openOrgKit: () => openOrgKitTab(message.view),
+    openOrgKit: () => openOrgKitTab(message.view, sender.tab),
     getActiveTabOrg: () => getActiveTabOrg(message),
     listSalesforceOrgs: () => listSalesforceOrgs(),
     fetchOrgInventory: () =>
@@ -109,7 +109,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     executeAnonymous: () => executeAnonymous(message.tabUrl, message.apex, message.apiVersion),
     fetchLatestApexDebug: () => fetchLatestApexDebug(message.tabUrl, message.apiVersion),
     getExtensionVersion: async () => ({
-      version: "1.8.4",
+      version: "1.8.5",
       hasSearchMetadata: typeof searchMetadata === "function",
       hasFlowCleaner: typeof listInactiveFlowVersions === "function",
       hasExecuteAnonymous: typeof executeAnonymous === "function",
@@ -132,54 +132,181 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-async function getActiveTabOrg(opts = {}) {
-  const preferredOrgKey = String(opts.preferredOrgKey || "").trim();
-  const preferredTabUrl = String(opts.tabUrl || "").trim();
+/**
+ * Resolve a Salesforce tab from an explicit session-switcher preference.
+ * Never stores sid — tabUrl / orgKey only.
+ */
+async function resolveTabFromPreference(preferredOrgKey, preferredTabUrl) {
+  const key = String(preferredOrgKey || "").trim();
+  const tabUrl = String(preferredTabUrl || "").trim();
+  if (!key && !tabUrl) return null;
 
-  let tab = null;
+  try {
+    const orgs = await listSalesforceOrgs();
+    const match =
+      (key && orgs.find((o) => o.orgKey === key)) ||
+      (tabUrl &&
+        orgs.find(
+          (o) =>
+            o.tabUrl === tabUrl ||
+            (o.apiBase && tabUrl.startsWith(o.apiBase)) ||
+            (o.hostname && tabUrl.includes(o.hostname)) ||
+            sameOrgAffinity(o.hostname || o.tabUrl || "", tabUrl)
+        )) ||
+      null;
+    if (match?.tabUrl) {
+      return {
+        id: match.tabId ?? null,
+        url: match.tabUrl,
+        title: match.tabTitle || "",
+        windowId: match.windowId ?? null
+      };
+    }
+  } catch {
+    /* fall through */
+  }
 
-  // Explicit tabUrl / remembered org key (session switcher) — never stores sid.
-  if (preferredOrgKey || preferredTabUrl) {
+  if (tabUrl && isSalesforceUrl(tabUrl) && !isLoginOnlyUrl(tabUrl)) {
+    return { id: null, url: tabUrl, title: "", windowId: null };
+  }
+  return null;
+}
+
+async function captureLaunchContext(hintTab) {
+  let sfTab = null;
+  if (hintTab?.url && isSalesforceUrl(hintTab.url) && !isLoginOnlyUrl(hintTab.url)) {
+    sfTab = hintTab;
+  } else {
+    // Active tab may already be OrgKit; pick most recently used Salesforce tab.
+    sfTab = await findSalesforceTab();
+  }
+  if (!sfTab?.url || !isSalesforceUrl(sfTab.url) || isLoginOnlyUrl(sfTab.url)) {
+    return null;
+  }
+  const payload = {
+    launchTabUrl: sfTab.url,
+    launchTabId: sfTab.id ?? null,
+    launchAt: Date.now()
+  };
+  try {
+    await chrome.storage.session.set(payload);
+  } catch {
+    /* session storage unavailable */
+  }
+  try {
+    // Clear pinned switcher so opening from a Salesforce org always wins.
+    await chrome.storage.local.set({
+      lastLaunchTabUrl: payload.launchTabUrl,
+      lastLaunchAt: payload.launchAt,
+      sessionPinned: false
+    });
+  } catch {
+    /* ignore */
+  }
+  return payload;
+}
+
+async function getLaunchContext() {
+  const maxAgeMs = 10 * 60 * 1000;
+  try {
+    const s = await chrome.storage.session.get({
+      launchTabUrl: "",
+      launchTabId: null,
+      launchAt: 0
+    });
+    if (s.launchTabUrl && Date.now() - Number(s.launchAt || 0) < maxAgeMs) {
+      return s;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const l = await chrome.storage.local.get({ lastLaunchTabUrl: "", lastLaunchAt: 0 });
+    if (l.lastLaunchTabUrl && Date.now() - Number(l.lastLaunchAt || 0) < maxAgeMs) {
+      return {
+        launchTabUrl: l.lastLaunchTabUrl,
+        launchTabId: null,
+        launchAt: l.lastLaunchAt
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+async function tabFromLaunchContext(launch) {
+  if (!launch?.launchTabUrl || !isSalesforceUrl(launch.launchTabUrl)) return null;
+
+  if (launch.launchTabId != null) {
     try {
-      const orgs = await listSalesforceOrgs();
-      const match =
-        (preferredOrgKey && orgs.find((o) => o.orgKey === preferredOrgKey)) ||
-        (preferredTabUrl &&
-          orgs.find(
-            (o) =>
-              o.tabUrl === preferredTabUrl ||
-              (o.apiBase && preferredTabUrl.startsWith(o.apiBase)) ||
-              (o.hostname && preferredTabUrl.includes(o.hostname))
-          )) ||
-        null;
-      if (match?.tabUrl) {
-        tab = {
-          id: match.tabId ?? null,
-          url: match.tabUrl,
-          title: match.tabTitle || "",
-          windowId: match.windowId ?? null
-        };
-      } else if (preferredTabUrl && isSalesforceUrl(preferredTabUrl) && !isLoginOnlyUrl(preferredTabUrl)) {
-        tab = { id: null, url: preferredTabUrl, title: "", windowId: null };
-      }
+      const t = await chrome.tabs.get(launch.launchTabId);
+      if (t?.url && isSalesforceUrl(t.url) && !isLoginOnlyUrl(t.url)) return t;
     } catch {
-      /* fall through to active-tab discovery */
+      /* tab closed */
     }
   }
 
+  try {
+    const all = await chrome.tabs.query({});
+    const matches = (all || []).filter(
+      (t) => t?.url && isSalesforceUrl(t.url) && !isLoginOnlyUrl(t.url)
+    );
+    const same = matches.find((t) => sameOrgAffinity(t.url, launch.launchTabUrl));
+    if (same) return same;
+  } catch {
+    /* ignore */
+  }
+
+  return {
+    id: launch.launchTabId ?? null,
+    url: launch.launchTabUrl,
+    title: "",
+    windowId: null
+  };
+}
+
+async function getActiveTabOrg(opts = {}) {
+  const preferredOrgKey = String(opts.preferredOrgKey || "").trim();
+  const preferredTabUrl = String(opts.tabUrl || "").trim();
+  const pinned = !!opts.pinned;
+  const useLaunchContext = opts.useLaunchContext !== false && !pinned;
+
+  let tab = null;
+
+  // 1) Explicit pinned session (user chose Active session dropdown).
+  if (pinned && (preferredOrgKey || preferredTabUrl)) {
+    tab = await resolveTabFromPreference(preferredOrgKey, preferredTabUrl);
+  }
+
+  // 2) Launch context — org the user was on when they opened OrgKit.
+  if (!tab?.url && useLaunchContext) {
+    const launch = await getLaunchContext();
+    tab = await tabFromLaunchContext(launch);
+  }
+
+  // 3) Most recently accessed Salesforce tab (works after OrgKit becomes active).
   if (!tab?.url) {
     tab = await findSalesforceTab();
   }
 
+  // 4) Soft preference fallback.
+  if (!tab?.url && (preferredOrgKey || preferredTabUrl)) {
+    tab = await resolveTabFromPreference(preferredOrgKey, preferredTabUrl);
+  }
+
   if (!tab?.url || !isSalesforceUrl(tab.url)) {
-    return { tab: tab || null, org: null, session: null };
+    return { tab: tab || null, org: null, session: null, launchUsed: false };
   }
   const org = parseOrgFromUrl(tab.url);
   const session = await getSessionForOrg(org);
-  return { tab, org, session };
+  return { tab, org, session, launchUsed: true };
 }
 
-async function openOrgKitTab(view) {
+async function openOrgKitTab(view, hintTab) {
+  // Capture Salesforce org BEFORE OrgKit becomes the active tab.
+  await captureLaunchContext(hintTab);
+
   const base = chrome.runtime.getURL("app/index.html");
   const url = view ? `${base}?view=${encodeURIComponent(view)}` : base;
   const all = await chrome.tabs.query({});
@@ -278,19 +405,34 @@ async function sfFetchTextDirect(url, sid) {
   return text;
 }
 
-/** Prefer the active tab; otherwise any Salesforce org tab in this window / all windows. */
+/**
+ * Prefer the active Salesforce tab; otherwise the most recently accessed
+ * Salesforce tab (critical when OrgKit itself is the active tab).
+ */
 async function findSalesforceTab() {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (active?.url && isSalesforceUrl(active.url) && !isLoginOnlyUrl(active.url)) {
     return active;
   }
 
-  const currentWindow = await chrome.tabs.query({ currentWindow: true });
-  const inWindow = currentWindow.find((t) => t.url && isSalesforceUrl(t.url) && !isLoginOnlyUrl(t.url));
-  if (inWindow) return inWindow;
-
   const all = await chrome.tabs.query({});
-  return all.find((t) => t.url && isSalesforceUrl(t.url) && !isLoginOnlyUrl(t.url)) || active || null;
+  const sfTabs = (all || []).filter(
+    (t) => t?.url && isSalesforceUrl(t.url) && !isLoginOnlyUrl(t.url)
+  );
+  if (!sfTabs.length) return active || null;
+
+  sfTabs.sort((a, b) => {
+    const byAccess = (b.lastAccessed || 0) - (a.lastAccessed || 0);
+    if (byAccess) return byAccess;
+    // Prefer same window as the active (OrgKit) tab when timestamps tie.
+    if (active?.windowId != null) {
+      const aSame = a.windowId === active.windowId ? 1 : 0;
+      const bSame = b.windowId === active.windowId ? 1 : 0;
+      if (aSame !== bSame) return bSame - aSame;
+    }
+    return (b.id || 0) - (a.id || 0);
+  });
+  return sfTabs[0];
 }
 
 function isLoginOnlyUrl(url) {

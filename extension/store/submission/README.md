@@ -1,8 +1,8 @@
-# OrgKit Chrome Web Store submission pack (v1.8.4)
+# OrgKit Chrome Web Store submission pack (v1.8.5)
 
 | Item | File |
 |---|---|
-| **Upload zip (this is what Chrome wants)** | `../releases/OrgKit-1.8.4-store.zip` |
+| **Upload zip (this is what Chrome wants)** | `../releases/OrgKit-1.8.5-store.zip` |
 | Checklist | `SUBMIT_CHECKLIST.md` |
 | Listing copy | `LISTING_COPY.txt` |
 | Permission justifications | `PERMISSION_JUSTIFICATIONS.txt` |
@@ -18,7 +18,7 @@ Start with `SUBMIT_CHECKLIST.md`.
 
 ## Important
 
-- Upload **`OrgKit-1.8.4-store.zip`** only (manifest.json at the **root** of the zip).
+- Upload **`OrgKit-1.8.5-store.zip`** only (manifest.json at the **root** of the zip).
 - Do **not** upload the whole repo or a zip that contains a nested `extension/` folder.
 - Privacy policy must be a **public HTTPS** URL that opens in Incognito.
 - Public listing must say **OrgKit** — use URLs from `STORE_LISTING_URLS.txt` (not internal repo names).

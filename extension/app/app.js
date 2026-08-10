@@ -133,6 +133,7 @@ const state = {
   org: null,
   session: null,
   preferredOrgKey: "",
+  sessionPinned: false,
   availableOrgs: [],
   favorites: [],
   lastSoqlJson: "",
@@ -1089,17 +1090,27 @@ function fillApiVersions() {
 
 async function loadPreferredOrgKey() {
   try {
-    const data = await chrome.storage.local.get({ preferredOrgKey: "" });
+    const data = await chrome.storage.local.get({
+      preferredOrgKey: "",
+      sessionPinned: false
+    });
     state.preferredOrgKey = String(data.preferredOrgKey || "").trim();
+    // Opening OrgKit from a Salesforce page clears sessionPinned in the SW.
+    state.sessionPinned = !!data.sessionPinned && !!state.preferredOrgKey;
   } catch {
     state.preferredOrgKey = "";
+    state.sessionPinned = false;
   }
 }
 
-async function savePreferredOrgKey(orgKey) {
+async function savePreferredOrgKey(orgKey, { pinned = state.sessionPinned } = {}) {
   state.preferredOrgKey = String(orgKey || "").trim();
+  state.sessionPinned = !!pinned && !!state.preferredOrgKey;
   try {
-    await chrome.storage.local.set({ preferredOrgKey: state.preferredOrgKey });
+    await chrome.storage.local.set({
+      preferredOrgKey: state.preferredOrgKey,
+      sessionPinned: state.sessionPinned
+    });
   } catch {
     /* local preference only */
   }
@@ -1125,7 +1136,8 @@ function bindSessionSwitcher() {
 
 async function switchActiveSession(orgKey) {
   const prev = currentOrgKey();
-  await savePreferredOrgKey(orgKey);
+  // User explicitly chose a session — pin until they open OrgKit from another org.
+  await savePreferredOrgKey(orgKey, { pinned: true });
   // Drop org-scoped caches when switching sandboxes / orgs.
   if (prev !== orgKey) {
     state.globalObjects = null;
@@ -1190,6 +1202,45 @@ function renderSessionSwitcher(orgs) {
 }
 
 async function refreshOrg() {
+  // Re-read pin flag — opening from Salesforce clears it in the service worker.
+  try {
+    const data = await chrome.storage.local.get({ sessionPinned: false, preferredOrgKey: "" });
+    state.sessionPinned = !!data.sessionPinned && !!String(data.preferredOrgKey || "").trim();
+    if (!state.sessionPinned) {
+      // Keep in-memory key for switcher highlight only; launch context wins.
+      state.preferredOrgKey = String(data.preferredOrgKey || state.preferredOrgKey || "").trim();
+    } else {
+      state.preferredOrgKey = String(data.preferredOrgKey || "").trim();
+    }
+  } catch {
+    /* keep current state */
+  }
+
+  const pinned = !!state.sessionPinned && !!state.preferredOrgKey;
+  const pinnedOrg =
+    pinned && Array.isArray(state.availableOrgs)
+      ? state.availableOrgs.find((o) => o.orgKey === state.preferredOrgKey)
+      : null;
+
+  // Fast path: bind to the Salesforce org you opened from (or pinned session)
+  // BEFORE scanning every session — so the banner is not empty on first paint.
+  const res = await send("getActiveTabOrg", {
+    pinned,
+    preferredOrgKey: pinned ? state.preferredOrgKey : "",
+    tabUrl: pinned ? pinnedOrg?.tabUrl || "" : "",
+    useLaunchContext: !pinned
+  });
+
+  if (!res.ok) {
+    setOrgBanner(null, null);
+  } else {
+    state.tab = res.result.tab;
+    state.org = res.result.org;
+    state.session = res.result.session;
+    setOrgBanner(state.org, state.session);
+  }
+
+  // Then enumerate open sandboxes/orgs for the Active session switcher.
   let list = [];
   try {
     const listRes = await send("listSalesforceOrgs");
@@ -1199,46 +1250,29 @@ async function refreshOrg() {
   }
   state.availableOrgs = list;
 
-  // Keep preferred key only if it still exists among open sessions.
-  if (state.preferredOrgKey && !list.some((o) => o.orgKey === state.preferredOrgKey)) {
-    await savePreferredOrgKey("");
+  if (pinned && state.preferredOrgKey && !list.some((o) => o.orgKey === state.preferredOrgKey)) {
+    await savePreferredOrgKey("", { pinned: false });
   }
 
-  const preferred =
-    state.preferredOrgKey ||
-    list.find((o) => o.hasSession)?.orgKey ||
-    list[0]?.orgKey ||
-    "";
-  const preferredOrg = list.find((o) => o.orgKey === preferred) || null;
-
-  const res = await send("getActiveTabOrg", {
-    preferredOrgKey: preferred,
-    tabUrl: preferredOrg?.tabUrl || ""
-  });
-  if (!res.ok) {
-    setOrgBanner(null, null);
-    renderSessionSwitcher(list);
-    return;
-  }
-  state.tab = res.result.tab;
-  state.org = res.result.org;
-  state.session = res.result.session;
-
-  const resolvedKey =
-    state.session?.userInfo?.organization_id ||
-    state.org?.apiBase ||
-    state.org?.hostname ||
-    preferred;
-  if (resolvedKey && resolvedKey !== state.preferredOrgKey) {
-    // Persist resolved key so the next open stays on this sandbox.
+  // Highlight the resolved org in the switcher (org key only — never sid).
+  if (state.org) {
     const matched = list.find(
       (o) =>
-        o.orgKey === resolvedKey ||
         o.orgKey === state.session?.userInfo?.organization_id ||
-        o.hostname === state.org?.hostname ||
-        o.apiBase === state.org?.apiBase
+        o.hostname === state.org.hostname ||
+        o.apiBase === state.org.apiBase ||
+        (state.tab?.url && o.tabUrl === state.tab.url)
     );
-    if (matched?.orgKey) await savePreferredOrgKey(matched.orgKey);
+    if (matched?.orgKey) {
+      state.preferredOrgKey = matched.orgKey;
+      if (!state.sessionPinned) {
+        try {
+          await chrome.storage.local.set({ preferredOrgKey: matched.orgKey });
+        } catch {
+          /* ignore */
+        }
+      }
+    }
   }
 
   setOrgBanner(state.org, state.session);

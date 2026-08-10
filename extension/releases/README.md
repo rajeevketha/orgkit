@@ -1,17 +1,12 @@
 # OrgKit — downloadable packages
 
-## Current (1.8.4)
+## Current (1.8.5)
 
-- `OrgKit-1.8.4-store.zip` — **Chrome Web Store upload package** (manifest at zip root)
-- `OrgKit-1.8.4-unpacked.zip` — same payload for local Load unpacked testing
-- `OrgKit-CURRENT.zip` / `OrgKit-store.zip` — aliases of the store package
+- `OrgKit-1.8.5-for-testing.zip` — share/test (Load unpacked)
+- `OrgKit-1.8.5-store.zip` — Chrome Web Store upload package
 
-### Local test
+### 1.8.5 notes
 
-1. Unzip `OrgKit-1.8.4-unpacked.zip`
-2. Chrome → `chrome://extensions` → Developer mode → Load unpacked
-
-### 1.8.4 notes
-
-- **Active session switcher** — pick between multiple open sandboxes/orgs in the banner.
-- 1.8.3 sandbox Lightning-only session fix included.
+- Initial open binds to the Salesforce org you launched from (session details load immediately).
+- Active session switcher is for changing orgs after that.
+- Includes sandbox Lightning session fix from 1.8.3/1.8.4.

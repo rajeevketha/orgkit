@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OrgKit",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "description": "Salesforce toolkit: Session Workbench, Org Compare, SOQL/Tooling, describe, NL\u2192SOQL. In-browser session only.",
   "icons": {
     "16": "icons/icon16.png",
