@@ -1,6 +1,7 @@
 import { QUICK_LINKS, decodeKeyPrefix } from "../lib/quick-links.js";
 import {
   isSalesforceUrl,
+  parseOrgFromUrl,
   normalizeSfId,
   to18,
   buildRecordUrl,
@@ -239,11 +240,22 @@ async function init() {
   if (launchHost) {
     state.launchTabUrl = `https://${launchHost}/`;
   }
+  // Instant Active session placeholder so the row is not empty while session validates.
+  paintLaunchSessionPlaceholder();
   await refreshOrg();
-  await refreshSoqlLibrary();
-  await refreshWorkbench();
   const deepView = bootParams.get("view");
   showView(deepView && TITLES[deepView] ? deepView : "home");
+}
+
+/** Show Active session from launchHost / storage before network session validation finishes. */
+function paintLaunchSessionPlaceholder() {
+  const url = String(state.launchTabUrl || "").trim();
+  if (!url || !isSalesforceUrl(url)) return;
+  const org = parseOrgFromUrl(url);
+  if (!org) return;
+  if (!state.org) state.org = org;
+  setOrgBanner(state.org, state.session);
+  renderSessionSwitcher(state.availableOrgs || []);
 }
 
 /**
@@ -1308,6 +1320,9 @@ async function refreshOrg() {
     /* keep current state */
   }
 
+  // Keep Active session visible while getActiveTabOrg validates the sid.
+  paintLaunchSessionPlaceholder();
+
   const pinned = !!state.sessionPinned && !!state.preferredOrgKey;
   const pinnedOrg =
     pinned && Array.isArray(state.availableOrgs)
@@ -1325,50 +1340,56 @@ async function refreshOrg() {
 
   if (!res.ok) {
     setOrgBanner(null, null);
+    renderSessionSwitcher([]);
   } else {
     state.tab = res.result.tab;
     state.org = res.result.org;
     state.session = res.result.session;
     if (res.result.launchTabUrl) state.launchTabUrl = res.result.launchTabUrl;
     setOrgBanner(state.org, state.session);
+    // Paint Active session immediately with the current org — don't wait for full scan.
+    renderSessionSwitcher(state.availableOrgs || []);
   }
 
-  // Then enumerate open sandboxes/orgs for the Active session switcher.
-  let list = [];
-  try {
-    const listRes = await send("listSalesforceOrgs");
-    list = listRes.ok && Array.isArray(listRes.result) ? listRes.result : [];
-  } catch {
-    list = [];
-  }
-  state.availableOrgs = list;
+  // Enumerate other open sandboxes/orgs in parallel with workbench hydrate.
+  // Light list (cookie presence only) should resolve quickly.
+  const listPromise = (async () => {
+    let list = [];
+    try {
+      const listRes = await send("listSalesforceOrgs");
+      list = listRes.ok && Array.isArray(listRes.result) ? listRes.result : [];
+    } catch {
+      list = [];
+    }
+    state.availableOrgs = list;
 
-  if (pinned && state.preferredOrgKey && !list.some((o) => o.orgKey === state.preferredOrgKey)) {
-    await savePreferredOrgKey("", { pinned: false });
-  }
+    if (pinned && state.preferredOrgKey && !findOrgInList(list, { orgKey: state.preferredOrgKey })) {
+      await savePreferredOrgKey("", { pinned: false });
+    }
 
-  // Sync preferredOrgKey to the org actually loaded (for switcher + workbench keys).
-  const matched = findOrgInList(list, {
-    orgKey: state.sessionPinned ? state.preferredOrgKey : "",
-    org: state.org,
-    session: state.session,
-    tabUrl: state.tab?.url || state.launchTabUrl || ""
-  });
-  if (matched?.orgKey) {
-    state.preferredOrgKey = matched.orgKey;
-    if (state.sessionPinned) {
-      try {
-        await chrome.storage.local.set({ preferredOrgKey: matched.orgKey, sessionPinned: true });
-      } catch {
-        /* ignore */
+    // Sync preferredOrgKey to the org actually loaded (for switcher + workbench keys).
+    const matched = findOrgInList(list, {
+      orgKey: state.sessionPinned ? state.preferredOrgKey : "",
+      org: state.org,
+      session: state.session,
+      tabUrl: state.tab?.url || state.launchTabUrl || ""
+    });
+    if (matched?.orgKey) {
+      state.preferredOrgKey = matched.orgKey;
+      if (state.sessionPinned) {
+        try {
+          await chrome.storage.local.set({ preferredOrgKey: matched.orgKey, sessionPinned: true });
+        } catch {
+          /* ignore */
+        }
       }
     }
-  }
 
-  setOrgBanner(state.org, state.session);
-  renderSessionSwitcher(list);
-  await refreshSoqlLibrary();
-  await refreshWorkbench();
+    setOrgBanner(state.org, state.session);
+    renderSessionSwitcher(list);
+  })();
+
+  await Promise.all([listPromise, refreshSoqlLibrary(), refreshWorkbench()]);
 }
 
 function currentOrgKey() {

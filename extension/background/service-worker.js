@@ -109,7 +109,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     executeAnonymous: () => executeAnonymous(message.tabUrl, message.apex, message.apiVersion),
     fetchLatestApexDebug: () => fetchLatestApexDebug(message.tabUrl, message.apiVersion),
     getExtensionVersion: async () => ({
-      version: "1.8.7",
+      version: "1.8.8",
       hasSearchMetadata: typeof searchMetadata === "function",
       hasFlowCleaner: typeof listInactiveFlowVersions === "function",
       hasExecuteAnonymous: typeof executeAnonymous === "function",
@@ -135,40 +135,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 /**
  * Resolve a Salesforce tab from an explicit session-switcher preference.
  * Never stores sid — tabUrl / orgKey only.
+ * Fast path: scan open tabs (+ stored URL). Avoids listSalesforceOrgs / userinfo.
  */
 async function resolveTabFromPreference(preferredOrgKey, preferredTabUrl) {
   const key = String(preferredOrgKey || "").trim();
   const tabUrl = String(preferredTabUrl || "").trim();
   if (!key && !tabUrl) return null;
 
+  let tabs = [];
   try {
-    const orgs = await listSalesforceOrgs();
-    const match =
-      (key && orgs.find((o) => o.orgKey === key)) ||
-      (tabUrl &&
-        orgs.find(
-          (o) =>
-            o.tabUrl === tabUrl ||
-            (o.apiBase && tabUrl.startsWith(o.apiBase)) ||
-            (o.hostname && tabUrl.includes(o.hostname)) ||
-            sameOrgAffinity(o.hostname || o.tabUrl || "", tabUrl)
-        )) ||
-      null;
-    if (match?.tabUrl) {
-      return {
-        id: match.tabId ?? null,
-        url: match.tabUrl,
-        title: match.tabTitle || "",
-        windowId: match.windowId ?? null
-      };
-    }
+    tabs = (await chrome.tabs.query({})) || [];
   } catch {
-    /* fall through */
+    tabs = [];
   }
 
+  const sfTabs = tabs.filter(
+    (t) => t?.url && isSalesforceUrl(t.url) && !isLoginOnlyUrl(t.url)
+  );
+
   if (tabUrl && isSalesforceUrl(tabUrl) && !isLoginOnlyUrl(tabUrl)) {
+    const exact = sfTabs.find((t) => t.url === tabUrl);
+    if (exact) return exact;
+    const affinity = sfTabs.find((t) => sameOrgAffinity(t.url, tabUrl));
+    if (affinity) return affinity;
     return { id: null, url: tabUrl, title: "", windowId: null };
   }
+
+  if (key) {
+    for (const t of sfTabs) {
+      const org = parseOrgFromUrl(t.url);
+      if (!org) continue;
+      if (
+        org.apiBase === key ||
+        org.hostname === key ||
+        org.myDomain === key ||
+        sameOrgAffinity(org.hostname || t.url, key) ||
+        String(t.url).includes(key)
+      ) {
+        return t;
+      }
+    }
+  }
+
   return null;
 }
 
@@ -300,8 +308,10 @@ async function getActiveTabOrg(opts = {}) {
     return { tab: tab || null, org: null, session: null, launchTabUrl: null };
   }
   const org = parseOrgFromUrl(tab.url);
-  const session = await getSessionForOrg(org);
-  const launch = useLaunchContext ? await getLaunchContext() : null;
+  const [session, launch] = await Promise.all([
+    getSessionForOrg(org),
+    useLaunchContext ? getLaunchContext() : Promise.resolve(null)
+  ]);
   return {
     tab,
     org,
@@ -471,9 +481,46 @@ async function getOrgSession(tabUrl) {
   return { org, session };
 }
 
+/** Short-lived in-memory session cache (sid stays in SW memory only; never written to storage). */
+const SESSION_CACHE_TTL_MS = 45_000;
+/** @type {Map<string, { at: number, result: object }>} */
+const sessionCache = new Map();
+
+function sessionCacheKey(org, strict) {
+  return `${strict ? "s" : "n"}|${org?.hostname || ""}|${org?.apiBase || ""}`;
+}
+
+function rememberSession(org, strict, result) {
+  if (!org || !result?.sid) return;
+  sessionCache.set(sessionCacheKey(org, strict), { at: Date.now(), result });
+}
+
 async function getSessionForOrg(org, { strict = false } = {}) {
   if (!org) throw new Error("Missing org");
+  const key = sessionCacheKey(org, strict);
+  const hit = sessionCache.get(key);
+  if (hit && Date.now() - hit.at < SESSION_CACHE_TTL_MS) {
+    return hit.result;
+  }
+  const result = await getSessionForOrgUncached(org, { strict });
+  rememberSession(org, strict, result);
+  return result;
+}
 
+async function probeUserInfo(apiBase, sid) {
+  try {
+    await ensureHostFetchAllowed(apiBase);
+  } catch {
+    /* fetch path still clarifies site access */
+  }
+  try {
+    return await sfFetchUrl(`${apiBase}/services/oauth2/userinfo`, sid);
+  } catch {
+    return await sfFetchUrl(restUrl(apiBase, "/chatter/users/me"), sid);
+  }
+}
+
+async function getSessionForOrgUncached(org, { strict = false } = {}) {
   // Prefer my.salesforce.com / pod salesforce.com sid for REST/Tooling.
   // Lightning/setup sids are host-scoped — they fail against a rewritten
   // *.my.salesforce.com apiBase ("Session expired or invalid"). That failure
@@ -499,35 +546,39 @@ async function getSessionForOrg(org, { strict = false } = {}) {
     candidates.push({ host: h, sid, rank: apiCookieRank(h) });
   };
 
-  for (const host of hostsToTry) {
-    if (!host) continue;
-    try {
-      const cookie = await chrome.cookies.get({ url: `https://${host}/`, name: "sid" });
-      if (cookie?.value) pushCandidate(host, cookie.value);
-    } catch {
-      /* ignore per-host cookie read failures */
-    }
-  }
+  // Parallel cookie host probes (was sequential — major sandbox latency).
+  await Promise.all(
+    hostsToTry.filter(Boolean).map(async (host) => {
+      try {
+        const cookie = await chrome.cookies.get({ url: `https://${host}/`, name: "sid" });
+        if (cookie?.value) pushCandidate(host, cookie.value);
+      } catch {
+        /* ignore per-host cookie read failures */
+      }
+    })
+  );
 
-  // Only read sid cookies on Salesforce-related domains (never scan unrelated sites).
-  // Always prefer cookies that match this org; avoid cross-org sid mixups (sandbox vs prod).
-  try {
-    const sfCookies = await listSalesforceSidCookies();
-    const ranked = [...sfCookies].sort(
-      (a, b) => apiCookieRank(b.domain) - apiCookieRank(a.domain)
-    );
-    const affinityMatches = ranked.filter((c) => sameOrgAffinity(org.hostname, c.domain));
-    for (const match of affinityMatches) {
-      if (match?.value) pushCandidate(String(match.domain || "").replace(/^\./, ""), match.value);
-    }
-    // Non-strict single-org UX: if affinity found nothing, allow top Salesforce sids.
-    if (!candidates.length && !strict) {
-      for (const match of ranked.slice(0, 3)) {
+  // Full Salesforce sid enumeration is relatively expensive. Skip when host probes
+  // already found a cookie for this org (common path after opening from a tab).
+  if (!candidates.length) {
+    try {
+      const sfCookies = await listSalesforceSidCookies();
+      const ranked = [...sfCookies].sort(
+        (a, b) => apiCookieRank(b.domain) - apiCookieRank(a.domain)
+      );
+      const affinityMatches = ranked.filter((c) => sameOrgAffinity(org.hostname, c.domain));
+      for (const match of affinityMatches) {
         if (match?.value) pushCandidate(String(match.domain || "").replace(/^\./, ""), match.value);
       }
+      // Non-strict single-org UX: if affinity found nothing, allow top Salesforce sids.
+      if (!candidates.length && !strict) {
+        for (const match of ranked.slice(0, 3)) {
+          if (match?.value) pushCandidate(String(match.domain || "").replace(/^\./, ""), match.value);
+        }
+      }
+    } catch {
+      /* ignore cookie enumeration failures */
     }
-  } catch {
-    /* ignore cookie enumeration failures */
   }
 
   candidates.sort((a, b) => b.rank - a.rank);
@@ -539,36 +590,29 @@ async function getSessionForOrg(org, { strict = false } = {}) {
   let bestUnvalidated = null;
   for (const candidate of candidates) {
     const bases = apiBaseCandidatesForCookieHost(candidate.host);
-    for (const apiBase of bases) {
-      try {
-        await ensureHostFetchAllowed(apiBase);
-      } catch {
-        /* continue — fetch error path still clarifies site access */
-      }
-      let userInfo = null;
-      try {
-        userInfo = await sfFetchUrl(`${apiBase}/services/oauth2/userinfo`, candidate.sid);
-      } catch {
-        try {
-          userInfo = await sfFetchUrl(restUrl(apiBase, "/chatter/users/me"), candidate.sid);
-        } catch {
-          if (!bestUnvalidated) {
-            bestUnvalidated = {
-              sid: candidate.sid,
-              apiBase,
-              cookieHost: candidate.host,
-              userInfo: null
-            };
-          }
-          continue;
-        }
-      }
+    // Race API bases for this cookie — first valid userinfo wins (do not wait for all).
+    try {
+      const { apiBase, userInfo } = await Promise.any(
+        bases.map(async (apiBase) => {
+          const userInfo = await probeUserInfo(apiBase, candidate.sid);
+          return { apiBase, userInfo };
+        })
+      );
       return {
         sid: candidate.sid,
         apiBase,
         cookieHost: candidate.host,
         userInfo
       };
+    } catch {
+      if (!bestUnvalidated && bases[0]) {
+        bestUnvalidated = {
+          sid: candidate.sid,
+          apiBase: bases[0],
+          cookieHost: candidate.host,
+          userInfo: null
+        };
+      }
     }
   }
 
@@ -582,13 +626,37 @@ async function getSessionForOrg(org, { strict = false } = {}) {
 }
 
 /**
+ * True when a sid cookie exists for this org (no userinfo / network).
+ * Used by the Active session picklist for fast paint.
+ */
+function cookieMatchesOrg(cookies, orgHostname) {
+  if (!orgHostname || !Array.isArray(cookies)) return false;
+  return cookies.some((c) => sameOrgAffinity(orgHostname, c.domain));
+}
+
+function alreadyListedOrg(byKey, org) {
+  return [...byKey.values()].some(
+    (e) =>
+      sameOrgAffinity(e.hostname || e.apiBase || e.tabUrl || "", org.hostname) ||
+      e.hostname === org.hostname ||
+      e.apiBase === org.apiBase
+  );
+}
+
+/**
  * List open Salesforce tabs / cookie-backed sessions for dual-org pickers.
  * Scans tabs in every Chrome window (not just the focused one).
  * Never returns sid values — only host, labels, and a tabUrl for subsequent API calls.
+ *
+ * Fast path: cookie presence only (no per-org userinfo). Full session validation
+ * happens when that org is selected / used for API calls.
  */
 async function listSalesforceOrgs() {
   // Empty query = all tabs across all windows in this Chrome profile.
-  const tabs = await chrome.tabs.query({});
+  const [tabs, cookies] = await Promise.all([
+    chrome.tabs.query({}).catch(() => []),
+    listSalesforceSidCookies().catch(() => [])
+  ]);
   const sfTabs = (tabs || []).filter(
     (t) => t?.url && isSalesforceUrl(t.url) && !isLoginOnlyUrl(t.url)
   );
@@ -677,23 +745,9 @@ async function listSalesforceOrgs() {
   for (const tab of sfTabs) {
     const org = parseOrgFromUrl(tab.url);
     if (!org) continue;
-    let session = null;
-    try {
-      session = await getSessionForOrg(org, { strict: true });
-    } catch {
-      session = null;
-    }
-    const orgId = session?.userInfo?.organization_id || "";
-    const orgKey = orgId || org.apiBase || org.hostname;
-    const username =
-      session?.userInfo?.preferred_username ||
-      session?.userInfo?.email ||
-      session?.userInfo?.username ||
-      "";
-    const displayName =
-      session?.userInfo?.organization_id && session?.userInfo?.preferred_username
-        ? `${org.myDomain || org.hostname} · ${username}`
-        : org.myDomain || org.hostname;
+    const hasSession = cookieMatchesOrg(cookies, org.hostname);
+    const orgKey = org.apiBase || org.hostname;
+    const displayName = org.myDomain || org.hostname;
     const win = tab.windowId != null ? windowById.get(tab.windowId) : null;
     const windowNumber = tab.windowId != null ? windowNumberById.get(tab.windowId) : null;
     const windowLabel =
@@ -714,14 +768,14 @@ async function listSalesforceOrgs() {
       windowFocused: !!win?.focused,
       windowLabel,
       hostname: org.hostname,
-      apiBase: session?.apiBase || org.apiBase,
+      apiBase: org.apiBase,
       myDomain: org.myDomain,
       envLabel: org.envLabel,
       isSandbox: !!org.isSandbox,
       isDevEd: !!org.isDevEd,
-      hasSession: !!session?.sid,
-      username,
-      orgId,
+      hasSession,
+      username: "",
+      orgId: "",
       sourceKind: "tab",
       label: `${org.envLabel}: ${displayName}`,
       source: {
@@ -737,64 +791,91 @@ async function listSalesforceOrgs() {
   }
 
   // Cookie-backed sessions without a matching open tab (still usable via apiBase URL).
-  try {
-    const cookies = await listSalesforceSidCookies();
-    for (const c of cookies) {
-      const domain = String(c.domain || "").replace(/^\./, "").toLowerCase();
-      // Include Lightning cookie sessions (rank 1) — sandboxes often have only those.
-      if (!domain || apiCookieRank(domain) < 1) continue;
-      const apiBase = toSalesforceApiBase(domain);
-      const tabUrl = `${apiBase}/`;
-      const org = parseOrgFromUrl(tabUrl);
-      if (!org) continue;
-      let session = null;
-      try {
-        session = await getSessionForOrg(org, { strict: true });
-      } catch {
-        session = null;
-      }
-      if (!session?.sid) continue;
-      const orgId = session?.userInfo?.organization_id || "";
-      const orgKey = orgId || org.apiBase || org.hostname;
-      if (byKey.has(orgKey)) continue;
-      const username =
-        session?.userInfo?.preferred_username ||
-        session?.userInfo?.email ||
-        session?.userInfo?.username ||
-        "";
-      upsert({
-        orgKey,
+  for (const c of cookies || []) {
+    const domain = String(c.domain || "").replace(/^\./, "").toLowerCase();
+    // Include Lightning/Setup cookie sessions (rank 1).
+    if (!domain || apiCookieRank(domain) < 1) continue;
+    // Keep cookie host in tabUrl so Setup/Lightning sids resolve correctly.
+    const tabUrl = `https://${domain}/`;
+    const org = parseOrgFromUrl(tabUrl);
+    if (!org) continue;
+    if (alreadyListedOrg(byKey, org)) continue;
+    const orgKey = org.apiBase || org.hostname;
+    if (byKey.has(orgKey)) continue;
+    upsert({
+      orgKey,
+      tabId: null,
+      tabUrl,
+      tabTitle: "",
+      windowId: null,
+      windowNumber: null,
+      windowFocused: false,
+      windowLabel: "Cookie session (no open tab)",
+      hostname: org.hostname,
+      apiBase: org.apiBase,
+      myDomain: org.myDomain,
+      envLabel: org.envLabel,
+      isSandbox: !!org.isSandbox,
+      isDevEd: !!org.isDevEd,
+      hasSession: true,
+      username: "",
+      orgId: "",
+      sourceKind: "cookie",
+      label: `${org.envLabel}: ${org.myDomain || org.hostname}`,
+      source: {
+        kind: "cookie",
         tabId: null,
         tabUrl,
         tabTitle: "",
         windowId: null,
         windowNumber: null,
-        windowFocused: false,
-        windowLabel: "Cookie session (no open tab)",
-        hostname: org.hostname,
-        apiBase: session.apiBase || org.apiBase,
-        myDomain: org.myDomain,
-        envLabel: org.envLabel,
-        isSandbox: !!org.isSandbox,
-        isDevEd: !!org.isDevEd,
-        hasSession: true,
-        username,
-        orgId,
-        sourceKind: "cookie",
-        label: `${org.envLabel}: ${org.myDomain || org.hostname}${username ? ` · ${username}` : ""}`,
-        source: {
-          kind: "cookie",
-          tabId: null,
-          tabUrl,
+        windowLabel: "Cookie session (no open tab)"
+      }
+    });
+  }
+
+  // Seed opener/launch org when tab URL discovery missed it (common on Setup hosts).
+  try {
+    const launch = await getLaunchContext();
+    if (launch?.launchTabUrl && isSalesforceUrl(launch.launchTabUrl) && !isLoginOnlyUrl(launch.launchTabUrl)) {
+      const org = parseOrgFromUrl(launch.launchTabUrl);
+      if (org && !alreadyListedOrg(byKey, org)) {
+        const hasSession = cookieMatchesOrg(cookies, org.hostname);
+        const orgKey = org.apiBase || org.hostname;
+        upsert({
+          orgKey,
+          tabId: launch.launchTabId ?? null,
+          tabUrl: launch.launchTabUrl,
           tabTitle: "",
           windowId: null,
           windowNumber: null,
-          windowLabel: "Cookie session (no open tab)"
-        }
-      });
+          windowFocused: false,
+          windowLabel: "Launch session",
+          hostname: org.hostname,
+          apiBase: org.apiBase,
+          myDomain: org.myDomain,
+          envLabel: org.envLabel,
+          isSandbox: !!org.isSandbox,
+          isDevEd: !!org.isDevEd,
+          hasSession,
+          username: "",
+          orgId: "",
+          sourceKind: "launch",
+          label: `${org.envLabel}: ${org.myDomain || org.hostname}`,
+          source: {
+            kind: "launch",
+            tabId: launch.launchTabId ?? null,
+            tabUrl: launch.launchTabUrl,
+            tabTitle: "",
+            windowId: null,
+            windowNumber: null,
+            windowLabel: "Launch session"
+          }
+        });
+      }
     }
   } catch {
-    /* ignore cookie enumeration failures */
+    /* ignore */
   }
 
   return [...byKey.values()]
@@ -1429,15 +1510,17 @@ async function listSalesforceSidCookies() {
     ".salesforce-setup.com",
     ".visualforce.com"
   ];
-  const out = [];
-  for (const domain of domains) {
-    try {
-      const part = await chrome.cookies.getAll({ name: "sid", domain });
-      if (Array.isArray(part)) out.push(...part);
-    } catch {
-      /* ignore per-domain failures */
-    }
-  }
+  const parts = await Promise.all(
+    domains.map(async (domain) => {
+      try {
+        const part = await chrome.cookies.getAll({ name: "sid", domain });
+        return Array.isArray(part) ? part : [];
+      } catch {
+        return [];
+      }
+    })
+  );
+  const out = parts.flat();
   // De-dupe by domain+value length marker (never log values)
   const seen = new Set();
   return out.filter((c) => {
