@@ -1,6 +1,6 @@
 ================================================================================
 Permission justifications — paste into Chrome Web Store Dashboard
-OrgKit 1.8.2 (Inspector-aligned lean permissions)
+OrgKit 1.8.3 (Inspector-aligned lean permissions)
 ================================================================================
 
 cookies

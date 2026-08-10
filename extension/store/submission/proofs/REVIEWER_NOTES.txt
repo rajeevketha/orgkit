@@ -1,5 +1,5 @@
 ================================================================================
-Notes for Chrome Web Store reviewers — OrgKit 1.8.2
+Notes for Chrome Web Store reviewers — OrgKit 1.8.3
 ================================================================================
 
 Single purpose
