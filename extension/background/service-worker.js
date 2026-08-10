@@ -84,7 +84,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return { ok: true };
     },
     openOrgKit: () => openOrgKitTab(message.view),
-    getActiveTabOrg: () => getActiveTabOrg(),
+    getActiveTabOrg: () => getActiveTabOrg(message),
     listSalesforceOrgs: () => listSalesforceOrgs(),
     fetchOrgInventory: () =>
       fetchOrgInventory(message.tabUrl, {
@@ -109,7 +109,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     executeAnonymous: () => executeAnonymous(message.tabUrl, message.apex, message.apiVersion),
     fetchLatestApexDebug: () => fetchLatestApexDebug(message.tabUrl, message.apiVersion),
     getExtensionVersion: async () => ({
-      version: "1.8.2",
+      version: "1.8.4",
       hasSearchMetadata: typeof searchMetadata === "function",
       hasFlowCleaner: typeof listInactiveFlowVersions === "function",
       hasExecuteAnonymous: typeof executeAnonymous === "function",
@@ -132,8 +132,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-async function getActiveTabOrg() {
-  const tab = await findSalesforceTab();
+async function getActiveTabOrg(opts = {}) {
+  const preferredOrgKey = String(opts.preferredOrgKey || "").trim();
+  const preferredTabUrl = String(opts.tabUrl || "").trim();
+
+  let tab = null;
+
+  // Explicit tabUrl / remembered org key (session switcher) — never stores sid.
+  if (preferredOrgKey || preferredTabUrl) {
+    try {
+      const orgs = await listSalesforceOrgs();
+      const match =
+        (preferredOrgKey && orgs.find((o) => o.orgKey === preferredOrgKey)) ||
+        (preferredTabUrl &&
+          orgs.find(
+            (o) =>
+              o.tabUrl === preferredTabUrl ||
+              (o.apiBase && preferredTabUrl.startsWith(o.apiBase)) ||
+              (o.hostname && preferredTabUrl.includes(o.hostname))
+          )) ||
+        null;
+      if (match?.tabUrl) {
+        tab = {
+          id: match.tabId ?? null,
+          url: match.tabUrl,
+          title: match.tabTitle || "",
+          windowId: match.windowId ?? null
+        };
+      } else if (preferredTabUrl && isSalesforceUrl(preferredTabUrl) && !isLoginOnlyUrl(preferredTabUrl)) {
+        tab = { id: null, url: preferredTabUrl, title: "", windowId: null };
+      }
+    } catch {
+      /* fall through to active-tab discovery */
+    }
+  }
+
+  if (!tab?.url) {
+    tab = await findSalesforceTab();
+  }
+
   if (!tab?.url || !isSalesforceUrl(tab.url)) {
     return { tab: tab || null, org: null, session: null };
   }

@@ -21,6 +21,11 @@
     <div class="org-top">
       <span id="envPill" class="pill">—</span>
       <span id="orgHost" class="org-host">Open a Salesforce tab</span>
+      <button type="button" class="btn ghost org-refresh-btn" id="refreshSessionsBtn" title="Refresh Salesforce sessions">↻</button>
+    </div>
+    <div class="org-session-row" id="orgSessionRow">
+      <label class="label tight" for="activeSessionSelect">Active session</label>
+      <select id="activeSessionSelect" class="select block-select" title="Switch between open Salesforce orgs / sandboxes"></select>
     </div>
     <div id="orgMeta" class="org-meta"></div>
   </section>
@@ -96,7 +101,7 @@
       <strong>Privacy &amp; data access</strong>
       <ul>
         <li>Uses your open Salesforce tab session in the browser only — OrgKit does not upload your <code>sid</code>.</li>
-        <li>Workbench history, scratch pad, and last Org Compare A/B pair stay in local browser storage (org keys only — never <code>sid</code>).</li>
+        <li>Workbench history, scratch pad, last Org Compare A/B pair, and the active session choice stay in local browser storage (org keys only — never <code>sid</code>).</li>
         <li>Deletes and saves ask for confirmation before changing org data.</li>
       </ul>
       <p class="trust-links">

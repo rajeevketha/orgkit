@@ -132,6 +132,8 @@ const state = {
   tab: null,
   org: null,
   session: null,
+  preferredOrgKey: "",
+  availableOrgs: [],
   favorites: [],
   lastSoqlJson: "",
   lastQueryJson: {
@@ -226,6 +228,8 @@ async function init() {
   renderFormulaHelpers();
   await loadFavorites();
   bindDescribeObjectSearch();
+  bindSessionSwitcher();
+  await loadPreferredOrgKey();
   await refreshOrg();
   await refreshSoqlLibrary();
   await refreshWorkbench();
@@ -1083,22 +1087,169 @@ function fillApiVersions() {
   });
 }
 
+async function loadPreferredOrgKey() {
+  try {
+    const data = await chrome.storage.local.get({ preferredOrgKey: "" });
+    state.preferredOrgKey = String(data.preferredOrgKey || "").trim();
+  } catch {
+    state.preferredOrgKey = "";
+  }
+}
+
+async function savePreferredOrgKey(orgKey) {
+  state.preferredOrgKey = String(orgKey || "").trim();
+  try {
+    await chrome.storage.local.set({ preferredOrgKey: state.preferredOrgKey });
+  } catch {
+    /* local preference only */
+  }
+}
+
+function bindSessionSwitcher() {
+  const select = $("#activeSessionSelect");
+  const refreshBtn = $("#refreshSessionsBtn");
+  select?.addEventListener("change", async () => {
+    const orgKey = select.value;
+    if (!orgKey) return;
+    await switchActiveSession(orgKey);
+  });
+  refreshBtn?.addEventListener("click", async () => {
+    refreshBtn.disabled = true;
+    try {
+      await refreshOrg();
+    } finally {
+      refreshBtn.disabled = false;
+    }
+  });
+}
+
+async function switchActiveSession(orgKey) {
+  const prev = currentOrgKey();
+  await savePreferredOrgKey(orgKey);
+  // Drop org-scoped caches when switching sandboxes / orgs.
+  if (prev !== orgKey) {
+    state.globalObjects = null;
+    state.toolingObjects = null;
+    state.describe = null;
+    state.describeFields = [];
+    state.describeObjects = [];
+    state.lastQueryTables = { soql: null, nl: null };
+    state.lastQueryRecords = { soql: null, nl: null };
+  }
+  await refreshOrg();
+}
+
+function sessionOptionLabel(org) {
+  const env = shortCompareEnvLabel(org.envLabel || (org.isSandbox ? "Sandbox" : "Production"));
+  const host = org.myDomain || org.hostname || org.orgKey;
+  const user = org.username ? ` · ${org.username}` : "";
+  const sess = org.hasSession ? "" : " (nav only)";
+  return `${env}: ${host}${user}${sess}`;
+}
+
+function renderSessionSwitcher(orgs) {
+  const select = $("#activeSessionSelect");
+  const row = $("#orgSessionRow");
+  if (!select || !row) return;
+
+  const list = Array.isArray(orgs) ? orgs : [];
+  const currentKey =
+    state.preferredOrgKey ||
+    state.session?.userInfo?.organization_id ||
+    state.org?.apiBase ||
+    state.org?.hostname ||
+    "";
+
+  select.replaceChildren();
+  if (!list.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No Salesforce sessions found — open a logged-in tab";
+    select.appendChild(opt);
+    select.disabled = true;
+    row.hidden = false;
+    return;
+  }
+
+  for (const org of list) {
+    const opt = document.createElement("option");
+    opt.value = org.orgKey;
+    opt.textContent = sessionOptionLabel(org);
+    if (org.orgKey === currentKey) opt.selected = true;
+    select.appendChild(opt);
+  }
+
+  // If preferred key missing from list, select first with session.
+  if (![...select.options].some((o) => o.selected && o.value)) {
+    const withSession = list.find((o) => o.hasSession) || list[0];
+    if (withSession) select.value = withSession.orgKey;
+  }
+
+  select.disabled = list.length < 1;
+  row.hidden = false;
+}
+
 async function refreshOrg() {
-  const res = await send("getActiveTabOrg");
+  let list = [];
+  try {
+    const listRes = await send("listSalesforceOrgs");
+    list = listRes.ok && Array.isArray(listRes.result) ? listRes.result : [];
+  } catch {
+    list = [];
+  }
+  state.availableOrgs = list;
+
+  // Keep preferred key only if it still exists among open sessions.
+  if (state.preferredOrgKey && !list.some((o) => o.orgKey === state.preferredOrgKey)) {
+    await savePreferredOrgKey("");
+  }
+
+  const preferred =
+    state.preferredOrgKey ||
+    list.find((o) => o.hasSession)?.orgKey ||
+    list[0]?.orgKey ||
+    "";
+  const preferredOrg = list.find((o) => o.orgKey === preferred) || null;
+
+  const res = await send("getActiveTabOrg", {
+    preferredOrgKey: preferred,
+    tabUrl: preferredOrg?.tabUrl || ""
+  });
   if (!res.ok) {
     setOrgBanner(null, null);
+    renderSessionSwitcher(list);
     return;
   }
   state.tab = res.result.tab;
   state.org = res.result.org;
   state.session = res.result.session;
+
+  const resolvedKey =
+    state.session?.userInfo?.organization_id ||
+    state.org?.apiBase ||
+    state.org?.hostname ||
+    preferred;
+  if (resolvedKey && resolvedKey !== state.preferredOrgKey) {
+    // Persist resolved key so the next open stays on this sandbox.
+    const matched = list.find(
+      (o) =>
+        o.orgKey === resolvedKey ||
+        o.orgKey === state.session?.userInfo?.organization_id ||
+        o.hostname === state.org?.hostname ||
+        o.apiBase === state.org?.apiBase
+    );
+    if (matched?.orgKey) await savePreferredOrgKey(matched.orgKey);
+  }
+
   setOrgBanner(state.org, state.session);
+  renderSessionSwitcher(list);
   await refreshSoqlLibrary();
   await refreshWorkbench();
 }
 
 function currentOrgKey() {
   return (
+    state.preferredOrgKey ||
     state.session?.userInfo?.organization_id ||
     state.org?.myDomain ||
     state.org?.hostname ||
@@ -1309,7 +1460,7 @@ function setOrgBanner(org, session) {
     pill.textContent = "—";
     pill.className = "pill";
     host.textContent = "Open a Salesforce tab";
-    meta.textContent = "Org-connected tools need an active Salesforce session.";
+    meta.textContent = "Org-connected tools need an active Salesforce session. Open sandboxes in Chrome, then pick one under Active session.";
     return;
   }
   banner.classList.remove("muted");
@@ -1323,9 +1474,13 @@ function setOrgBanner(org, session) {
     session?.userInfo?.name ||
     "";
   const orgId = session?.userInfo?.organization_id || "";
+  const multi =
+    Array.isArray(state.availableOrgs) && state.availableOrgs.length > 1
+      ? ` · ${state.availableOrgs.length} sessions — use Active session to switch`
+      : "";
   meta.textContent = [user, orgId ? `Org: ${orgId}` : "", session?.sid ? "Session: connected" : "Session: navigation only"]
     .filter(Boolean)
-    .join(" · ");
+    .join(" · ") + multi;
 }
 
 function apiVersion() {
