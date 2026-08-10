@@ -109,7 +109,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     executeAnonymous: () => executeAnonymous(message.tabUrl, message.apex, message.apiVersion),
     fetchLatestApexDebug: () => fetchLatestApexDebug(message.tabUrl, message.apiVersion),
     getExtensionVersion: async () => ({
-      version: "1.8.6",
+      version: "1.8.7",
       hasSearchMetadata: typeof searchMetadata === "function",
       hasFlowCleaner: typeof listInactiveFlowVersions === "function",
       hasExecuteAnonymous: typeof executeAnonymous === "function",
@@ -312,10 +312,21 @@ async function getActiveTabOrg(opts = {}) {
 
 async function openOrgKitTab(view, hintTab) {
   // Capture Salesforce org BEFORE OrgKit becomes the active tab.
-  await captureLaunchContext(hintTab);
+  const launch = await captureLaunchContext(hintTab);
 
   const base = chrome.runtime.getURL("app/index.html");
-  const url = view ? `${base}?view=${encodeURIComponent(view)}` : base;
+  const params = new URLSearchParams();
+  if (view) params.set("view", view);
+  // Pass host in the URL so Active session can default even if storage is slow.
+  if (launch?.launchTabUrl) {
+    try {
+      params.set("launchHost", new URL(launch.launchTabUrl).hostname);
+    } catch {
+      /* ignore */
+    }
+  }
+  const qs = params.toString();
+  const url = qs ? `${base}?${qs}` : base;
   const all = await chrome.tabs.query({});
   const existing = all.find((t) => typeof t.url === "string" && t.url.startsWith(base));
   if (existing?.id) {
@@ -1400,9 +1411,9 @@ function apiCookieRank(domain) {
   const d = String(domain || "").replace(/^\./, "").toLowerCase();
   if (d.endsWith(".my.salesforce.com")) return 3;
   if (d.endsWith(".salesforce.com") && !d.includes("setup")) return 2;
-  // Lightning sid is usable when apiBase stays on the Lightning host (sandbox UX).
+  // Lightning / Setup sids are usable when apiBase candidates rewrite correctly.
   if (d.endsWith(".lightning.force.com")) return 1;
-  if (d.endsWith(".salesforce-setup.com")) return 0;
+  if (d.endsWith(".salesforce-setup.com")) return 1;
   return 0;
 }
 

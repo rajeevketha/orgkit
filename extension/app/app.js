@@ -233,10 +233,16 @@ async function init() {
   bindDescribeObjectSearch();
   bindSessionSwitcher();
   await loadPreferredOrgKey();
+  // Opener host from toolbar/content-script launch (defaults Active session).
+  const bootParams = new URLSearchParams(location.search);
+  const launchHost = String(bootParams.get("launchHost") || "").trim().toLowerCase();
+  if (launchHost) {
+    state.launchTabUrl = `https://${launchHost}/`;
+  }
   await refreshOrg();
   await refreshSoqlLibrary();
   await refreshWorkbench();
-  const deepView = new URLSearchParams(location.search).get("view");
+  const deepView = bootParams.get("view");
   showView(deepView && TITLES[deepView] ? deepView : "home");
 }
 
@@ -1201,22 +1207,63 @@ function findOrgInList(list, { orgKey, org, session, tabUrl } = {}) {
   return null;
 }
 
+function currentOrgListEntry() {
+  if (!state.org && !state.tab?.url && !state.launchTabUrl) return null;
+  const orgKey =
+    state.session?.userInfo?.organization_id ||
+    state.org?.apiBase ||
+    state.org?.hostname ||
+    state.tab?.url ||
+    state.launchTabUrl ||
+    "current";
+  const username =
+    state.session?.userInfo?.preferred_username ||
+    state.session?.userInfo?.email ||
+    state.session?.userInfo?.username ||
+    "";
+  return {
+    orgKey,
+    hostname: state.org?.hostname || "",
+    apiBase: state.session?.apiBase || state.org?.apiBase || "",
+    myDomain: state.org?.myDomain || "",
+    envLabel: state.org?.envLabel || "Org",
+    isSandbox: !!state.org?.isSandbox,
+    isDevEd: !!state.org?.isDevEd,
+    hasSession: !!state.session?.sid,
+    username,
+    tabUrl: state.tab?.url || state.launchTabUrl || "",
+    orgId: state.session?.userInfo?.organization_id || "",
+    label: `${state.org?.envLabel || "Org"}: ${state.org?.myDomain || state.org?.hostname || orgKey}`
+  };
+}
+
 function renderSessionSwitcher(orgs) {
   const select = $("#activeSessionSelect");
   const row = $("#orgSessionRow");
   if (!select || !row) return;
 
-  const list = Array.isArray(orgs) ? orgs : [];
+  // Always include the currently connected org so the picklist is never blank
+  // when Session: connected (listSalesforceOrgs can miss Setup-only tabs).
+  let list = Array.isArray(orgs) ? [...orgs] : [];
+  const current = currentOrgListEntry();
+  if (current) {
+    const existing = findOrgInList(list, {
+      orgKey: current.orgKey,
+      org: state.org,
+      session: state.session,
+      tabUrl: current.tabUrl
+    });
+    if (!existing) list.unshift(current);
+  }
 
-  // Default Active session to the org currently loaded (launch/current),
-  // not a stale preferredOrgKey from a previous sandbox.
+  // Default Active session to the org currently loaded (launch/current).
   const active = findOrgInList(list, {
-    orgKey: state.sessionPinned ? state.preferredOrgKey : "",
+    orgKey: state.sessionPinned ? state.preferredOrgKey : current?.orgKey || "",
     org: state.org,
     session: state.session,
-    tabUrl: state.tab?.url || state.launchTabUrl || ""
-  });
-  const selectedKey = active?.orgKey || "";
+    tabUrl: state.tab?.url || state.launchTabUrl || current?.tabUrl || ""
+  }) || current;
+  const selectedKey = active?.orgKey || current?.orgKey || "";
 
   select.replaceChildren();
   if (!list.length) {
@@ -1231,22 +1278,18 @@ function renderSessionSwitcher(orgs) {
 
   for (const org of list) {
     const opt = document.createElement("option");
-    opt.value = org.orgKey;
-    opt.textContent = sessionOptionLabel(org);
+    opt.value = String(org.orgKey || "");
+    opt.textContent = sessionOptionLabel(org) || String(org.orgKey || org.hostname || "Salesforce org");
     select.appendChild(opt);
   }
 
   if (selectedKey && [...select.options].some((o) => o.value === selectedKey)) {
     select.value = selectedKey;
-  } else if (active?.orgKey) {
-    select.value = active.orgKey;
   } else {
-    // Last resort only when we could not resolve the current org.
-    const withSession = list.find((o) => o.hasSession) || list[0];
-    if (withSession) select.value = withSession.orgKey;
+    select.selectedIndex = 0;
   }
 
-  select.disabled = list.length < 1;
+  select.disabled = false;
   row.hidden = false;
 }
 
