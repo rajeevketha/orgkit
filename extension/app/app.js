@@ -4,6 +4,7 @@ import {
   normalizeSfId,
   to18,
   buildRecordUrl,
+  sameOrgAffinity,
   DEFAULT_API_VERSION
 } from "../lib/salesforce.js";
 import { generateSoql } from "../lib/nl-soql.js";
@@ -134,6 +135,7 @@ const state = {
   session: null,
   preferredOrgKey: "",
   sessionPinned: false,
+  launchTabUrl: "",
   availableOrgs: [],
   favorites: [],
   lastSoqlJson: "",
@@ -1159,18 +1161,62 @@ function sessionOptionLabel(org) {
   return `${env}: ${host}${user}${sess}`;
 }
 
+/** Match list entry to the org currently bound in the workbench. */
+function findOrgInList(list, { orgKey, org, session, tabUrl } = {}) {
+  const rows = Array.isArray(list) ? list : [];
+  if (!rows.length) return null;
+
+  if (orgKey) {
+    const byKey = rows.find((o) => o.orgKey === orgKey);
+    if (byKey) return byKey;
+  }
+
+  const orgId = session?.userInfo?.organization_id || "";
+  if (orgId) {
+    const byId = rows.find((o) => o.orgKey === orgId || o.orgId === orgId);
+    if (byId) return byId;
+  }
+
+  if (tabUrl) {
+    const byUrl = rows.find(
+      (o) =>
+        o.tabUrl === tabUrl ||
+        (o.hostname && tabUrl.includes(o.hostname)) ||
+        (o.apiBase && tabUrl.startsWith(o.apiBase)) ||
+        sameOrgAffinity(o.hostname || o.tabUrl || "", tabUrl)
+    );
+    if (byUrl) return byUrl;
+  }
+
+  if (org?.hostname || org?.apiBase) {
+    const byHost = rows.find(
+      (o) =>
+        o.hostname === org.hostname ||
+        (org.apiBase && o.apiBase === org.apiBase) ||
+        sameOrgAffinity(o.hostname || o.apiBase || o.tabUrl || "", org.hostname || org.apiBase || "")
+    );
+    if (byHost) return byHost;
+  }
+
+  return null;
+}
+
 function renderSessionSwitcher(orgs) {
   const select = $("#activeSessionSelect");
   const row = $("#orgSessionRow");
   if (!select || !row) return;
 
   const list = Array.isArray(orgs) ? orgs : [];
-  const currentKey =
-    state.preferredOrgKey ||
-    state.session?.userInfo?.organization_id ||
-    state.org?.apiBase ||
-    state.org?.hostname ||
-    "";
+
+  // Default Active session to the org currently loaded (launch/current),
+  // not a stale preferredOrgKey from a previous sandbox.
+  const active = findOrgInList(list, {
+    orgKey: state.sessionPinned ? state.preferredOrgKey : "",
+    org: state.org,
+    session: state.session,
+    tabUrl: state.tab?.url || state.launchTabUrl || ""
+  });
+  const selectedKey = active?.orgKey || "";
 
   select.replaceChildren();
   if (!list.length) {
@@ -1187,12 +1233,15 @@ function renderSessionSwitcher(orgs) {
     const opt = document.createElement("option");
     opt.value = org.orgKey;
     opt.textContent = sessionOptionLabel(org);
-    if (org.orgKey === currentKey) opt.selected = true;
     select.appendChild(opt);
   }
 
-  // If preferred key missing from list, select first with session.
-  if (![...select.options].some((o) => o.selected && o.value)) {
+  if (selectedKey && [...select.options].some((o) => o.value === selectedKey)) {
+    select.value = selectedKey;
+  } else if (active?.orgKey) {
+    select.value = active.orgKey;
+  } else {
+    // Last resort only when we could not resolve the current org.
     const withSession = list.find((o) => o.hasSession) || list[0];
     if (withSession) select.value = withSession.orgKey;
   }
@@ -1202,16 +1251,16 @@ function renderSessionSwitcher(orgs) {
 }
 
 async function refreshOrg() {
-  // Re-read pin flag — opening from Salesforce clears it in the service worker.
+  // Re-read pin flag — opening from Salesforce clears pin + preferredOrgKey in the SW.
   try {
-    const data = await chrome.storage.local.get({ sessionPinned: false, preferredOrgKey: "" });
+    const data = await chrome.storage.local.get({
+      sessionPinned: false,
+      preferredOrgKey: "",
+      lastLaunchTabUrl: ""
+    });
     state.sessionPinned = !!data.sessionPinned && !!String(data.preferredOrgKey || "").trim();
-    if (!state.sessionPinned) {
-      // Keep in-memory key for switcher highlight only; launch context wins.
-      state.preferredOrgKey = String(data.preferredOrgKey || state.preferredOrgKey || "").trim();
-    } else {
-      state.preferredOrgKey = String(data.preferredOrgKey || "").trim();
-    }
+    state.preferredOrgKey = state.sessionPinned ? String(data.preferredOrgKey || "").trim() : "";
+    state.launchTabUrl = String(data.lastLaunchTabUrl || state.launchTabUrl || "").trim();
   } catch {
     /* keep current state */
   }
@@ -1227,7 +1276,7 @@ async function refreshOrg() {
   const res = await send("getActiveTabOrg", {
     pinned,
     preferredOrgKey: pinned ? state.preferredOrgKey : "",
-    tabUrl: pinned ? pinnedOrg?.tabUrl || "" : "",
+    tabUrl: pinned ? pinnedOrg?.tabUrl || "" : state.launchTabUrl || "",
     useLaunchContext: !pinned
   });
 
@@ -1237,6 +1286,7 @@ async function refreshOrg() {
     state.tab = res.result.tab;
     state.org = res.result.org;
     state.session = res.result.session;
+    if (res.result.launchTabUrl) state.launchTabUrl = res.result.launchTabUrl;
     setOrgBanner(state.org, state.session);
   }
 
@@ -1254,23 +1304,20 @@ async function refreshOrg() {
     await savePreferredOrgKey("", { pinned: false });
   }
 
-  // Highlight the resolved org in the switcher (org key only — never sid).
-  if (state.org) {
-    const matched = list.find(
-      (o) =>
-        o.orgKey === state.session?.userInfo?.organization_id ||
-        o.hostname === state.org.hostname ||
-        o.apiBase === state.org.apiBase ||
-        (state.tab?.url && o.tabUrl === state.tab.url)
-    );
-    if (matched?.orgKey) {
-      state.preferredOrgKey = matched.orgKey;
-      if (!state.sessionPinned) {
-        try {
-          await chrome.storage.local.set({ preferredOrgKey: matched.orgKey });
-        } catch {
-          /* ignore */
-        }
+  // Sync preferredOrgKey to the org actually loaded (for switcher + workbench keys).
+  const matched = findOrgInList(list, {
+    orgKey: state.sessionPinned ? state.preferredOrgKey : "",
+    org: state.org,
+    session: state.session,
+    tabUrl: state.tab?.url || state.launchTabUrl || ""
+  });
+  if (matched?.orgKey) {
+    state.preferredOrgKey = matched.orgKey;
+    if (state.sessionPinned) {
+      try {
+        await chrome.storage.local.set({ preferredOrgKey: matched.orgKey, sessionPinned: true });
+      } catch {
+        /* ignore */
       }
     }
   }

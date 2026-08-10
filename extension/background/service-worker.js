@@ -109,7 +109,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     executeAnonymous: () => executeAnonymous(message.tabUrl, message.apex, message.apiVersion),
     fetchLatestApexDebug: () => fetchLatestApexDebug(message.tabUrl, message.apiVersion),
     getExtensionVersion: async () => ({
-      version: "1.8.5",
+      version: "1.8.6",
       hasSearchMetadata: typeof searchMetadata === "function",
       hasFlowCleaner: typeof listInactiveFlowVersions === "function",
       hasExecuteAnonymous: typeof executeAnonymous === "function",
@@ -194,11 +194,12 @@ async function captureLaunchContext(hintTab) {
     /* session storage unavailable */
   }
   try {
-    // Clear pinned switcher so opening from a Salesforce org always wins.
+    // Clear pinned/previous Active session so the opener org is selected by default.
     await chrome.storage.local.set({
       lastLaunchTabUrl: payload.launchTabUrl,
       lastLaunchAt: payload.launchAt,
-      sessionPinned: false
+      sessionPinned: false,
+      preferredOrgKey: ""
     });
   } catch {
     /* ignore */
@@ -296,11 +297,17 @@ async function getActiveTabOrg(opts = {}) {
   }
 
   if (!tab?.url || !isSalesforceUrl(tab.url)) {
-    return { tab: tab || null, org: null, session: null, launchUsed: false };
+    return { tab: tab || null, org: null, session: null, launchTabUrl: null };
   }
   const org = parseOrgFromUrl(tab.url);
   const session = await getSessionForOrg(org);
-  return { tab, org, session, launchUsed: true };
+  const launch = useLaunchContext ? await getLaunchContext() : null;
+  return {
+    tab,
+    org,
+    session,
+    launchTabUrl: launch?.launchTabUrl || tab.url || null
+  };
 }
 
 async function openOrgKitTab(view, hintTab) {

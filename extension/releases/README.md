@@ -1,12 +1,10 @@
 # OrgKit — downloadable packages
 
-## Current (1.8.5)
+## Current (1.8.6)
 
-- `OrgKit-1.8.5-for-testing.zip` — share/test (Load unpacked)
-- `OrgKit-1.8.5-store.zip` — Chrome Web Store upload package
+- `OrgKit-1.8.6-for-testing.zip` — share/test (Load unpacked)
 
-### 1.8.5 notes
+### 1.8.6 notes
 
-- Initial open binds to the Salesforce org you launched from (session details load immediately).
-- Active session switcher is for changing orgs after that.
-- Includes sandbox Lightning session fix from 1.8.3/1.8.4.
+- Active session dropdown now defaults to the Salesforce org you launched from.
+- Previous org selection no longer sticks incorrectly on open.
