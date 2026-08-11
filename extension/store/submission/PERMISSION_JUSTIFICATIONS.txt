@@ -1,0 +1,35 @@
+================================================================================
+Permission justifications — paste into Chrome Web Store Dashboard
+OrgKit 1.8.8
+================================================================================
+
+cookies
+-------
+Required to read the Salesforce sid cookie on Salesforce-related domains so OrgKit can call Salesforce REST/Tooling APIs using the user’s existing logged-in browser session. This is the same session model used by established Salesforce developer tools such as Salesforce Inspector Reloaded. OrgKit does not read cookies from non-Salesforce sites. The sid is used in-browser as an Authorization bearer token, is never written to sync storage, and is never sent to AI providers.
+
+storage
+-------
+Required to store user settings, favorites, saved SOQL library entries, Session Workbench continue history and scratch pad (per org key), last Org Compare A/B org-key pair, UI preferences, and optional AI configuration locally in the browser profile. Session cookies (sid) are never stored in extension storage.
+
+tabs
+----
+Required to discover open Salesforce tabs across Chrome windows in the same profile so Active session and Org Compare can list and switch between logged-in orgs/sandboxes. OrgKit only uses tab URLs/titles for Salesforce hosts to build the session picker; it does not read page content via the tabs API and never stores sid values from tabs.
+
+Host permissions
+  https://*.salesforce.com/*
+  https://*.force.com/*
+  https://*.cloudforce.com/*
+  https://*.salesforce-setup.com/*
+  https://*.visualforce.com/*
+---------------------------------
+Required to call Salesforce APIs from the extension service worker and to show the on-page OrgKit launcher / quick links on Salesforce pages. Not used for unrelated websites. Host scope is limited to Salesforce properties.
+
+Optional host permissions
+  https://api.openai.com/*
+  https://*.openai.com/*
+---------------------------------
+Only if the user enables AI assist and grants permission. Used solely for optional NL/formula/error/Apex assistance with the user’s own API key. Salesforce session cookies are never included in AI prompts.
+
+Permissions intentionally NOT requested
+---------------------------------------
+OrgKit does not request activeTab or scripting. Page helpers use a declared content script; API calls use service-worker fetch with the sid cookie.

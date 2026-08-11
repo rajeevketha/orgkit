@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="refresh" content="0; url=../app/index.html" />
+  <title>OrgKit</title>
+  <script>
+    location.replace(chrome.runtime.getURL("app/index.html") + location.search + location.hash);
+  </script>
+</head>
+<body>
+  <p><a id="go" href="../app/index.html">Open OrgKit</a></p>
+  <script>
+    document.getElementById("go").href = chrome.runtime.getURL("app/index.html") + location.search + location.hash;
+  </script>
+</body>
+</html>
