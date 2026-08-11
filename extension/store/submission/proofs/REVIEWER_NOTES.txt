@@ -25,7 +25,8 @@ Lean permissions
 Required: cookies, storage.
 Host permissions: Salesforce domains only.
 Optional: OpenAI hosts if the user enables AI.
-Does NOT request tabs, activeTab, or scripting.
+Requests tabs only to list open Salesforce org/sandbox sessions across windows.
+Does NOT request activeTab or scripting.
 
 UI entry point
 --------------

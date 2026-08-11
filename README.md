@@ -4,7 +4,7 @@ Chrome extension for Salesforce developers — Session Workbench, dual-org **Org
 
 ## Version
 
-**1.8.2**
+**1.8.8**
 
 ## Features
 
@@ -23,16 +23,18 @@ Describe Browser, Metadata Quick Open, Package.xml Builder, Inactive Flow Cleane
 
 ## Install (unpacked)
 
-1. Download [`extension/releases/OrgKit-1.8.2-unpacked.zip`](extension/releases/OrgKit-1.8.2-unpacked.zip) and unzip
+1. Download [`extension/releases/OrgKit-store.zip`](extension/releases/OrgKit-store.zip) (always current) and unzip
 2. Chrome → `chrome://extensions` → Developer mode → **Load unpacked**
 3. Open logged-in Salesforce tabs
 4. Alt+Shift+O (or click the OrgKit icon / on-page launcher)
 
 ## Chrome Web Store
 
-- Upload package: [`extension/releases/OrgKit-1.8.2-store.zip`](extension/releases/OrgKit-1.8.2-store.zip)
-- Full listing pack: [`extension/releases/OrgKit-1.8.2-CWS-submission.zip`](extension/releases/OrgKit-1.8.2-CWS-submission.zip)
+- **Default upload zip:** [`extension/releases/OrgKit-store.zip`](extension/releases/OrgKit-store.zip)
+- Versioned: [`extension/releases/OrgKit-1.8.8-store.zip`](extension/releases/OrgKit-1.8.8-store.zip)
+- Rebuild: `bash extension/scripts/pack-release.sh`
 - Listing URLs: [`extension/store/submission/STORE_LISTING_URLS.txt`](extension/store/submission/STORE_LISTING_URLS.txt)
+- Permission paste text: [`extension/store/submission/PERMISSION_JUSTIFICATIONS.txt`](extension/store/submission/PERMISSION_JUSTIFICATIONS.txt)
 
 ## Public site (OrgKit URLs)
 

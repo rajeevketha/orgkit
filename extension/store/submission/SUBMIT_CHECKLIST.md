@@ -1,10 +1,10 @@
-# OrgKit — Chrome Web Store submit checklist (v1.8.5)
+# OrgKit — Chrome Web Store submit checklist (v1.8.8)
 
 ## 1. Upload package (required)
 
-- [ ] Upload **`OrgKit-1.8.5-store.zip`** (manifest at zip root — do **not** zip a parent folder)
-- [ ] Confirm version **1.8.5**
-- [ ] Confirm permissions: **cookies** + **storage** only (+ Salesforce hosts; OpenAI optional)
+- [ ] Upload **`OrgKit-store.zip`** (or `OrgKit-1.8.8-store.zip`) — manifest at zip root
+- [ ] Confirm version **1.8.8**
+- [ ] Confirm permissions: **cookies** + **storage** + **tabs** (+ Salesforce hosts; OpenAI optional)
 - [ ] Confirm UI entry is `app/index.html`
 
 ## 2. Store listing (required)
@@ -28,7 +28,7 @@
 ## 4. Pre-flight before “Submit for review”
 
 - [ ] Privacy URL opens in Incognito
-- [ ] Load `OrgKit-1.8.5-store.zip` unpacked locally → Session connected on a Salesforce tab
+- [ ] Load `OrgKit-store.zip` unpacked locally → Session connected on a Salesforce tab
 - [ ] Workbench home loads; Org Compare lists sessions; SOQL runs; Describe works
 - [ ] Opens as `chrome-extension://…/app/index.html`
 - [ ] Submit for review

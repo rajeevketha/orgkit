@@ -50,7 +50,7 @@ Permissions (summary)
 • cookies — Salesforce sid on Salesforce domains only
 • storage — settings, favorites, saved SOQL, workbench history/scratch, last Org Compare A/B org keys (never stores sid)
 • Host permissions — Salesforce domains only; OpenAI hosts are optional
-• Does not request tabs, activeTab, or scripting
+• Does not request activeTab or scripting (uses tabs only to list Salesforce sessions)
 
 ================================================================================
 SINGLE PURPOSE
