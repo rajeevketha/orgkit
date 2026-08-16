@@ -4,7 +4,7 @@ Chrome extension for Salesforce developers — **NL → SOQL**, Session Workbenc
 
 ## Version
 
-**1.8.9**
+**1.9.0**
 
 ## Features
 
@@ -12,8 +12,12 @@ Chrome extension for Salesforce developers — **NL → SOQL**, Session Workbenc
 - Plain English → runnable SOQL for standard, custom, CMDT, and Tooling
 - Featured on the Session Workbench home with example prompts
 
+### Schema Explorer
+- Parent/child relationship map for **standard**, **custom (`__c`)**, and **custom metadata (`__mdt`)**
+- Click to hop objects; query this object, parent-path SOQL, child subqueries; jump to Describe or NL → SOQL
+
 ### Session Workbench (home)
-- Quick launch: **NL → SOQL** · SOQL · Anon Apex · Describe · **Org Compare** · Metadata · Debug logs · Record/ID
+- Quick launch: **NL → SOQL** · **Schema** · SOQL · Anon Apex · Describe · **Org Compare** · Metadata · Debug logs · Record/ID
 - Continue / pinned SOQL / per-org scratch pad (local storage, no `sid`)
 
 ### Org Compare
@@ -35,7 +39,7 @@ Describe Browser, Metadata Quick Open, Package.xml Builder, Inactive Flow Cleane
 ## Chrome Web Store
 
 - **Default upload zip:** [`extension/releases/OrgKit-store.zip`](extension/releases/OrgKit-store.zip)
-- Versioned: [`extension/releases/OrgKit-1.8.9-store.zip`](extension/releases/OrgKit-1.8.9-store.zip)
+- Versioned: [`extension/releases/OrgKit-1.9.0-store.zip`](extension/releases/OrgKit-1.9.0-store.zip)
 - Rebuild: `bash extension/scripts/pack-release.sh`
 - Listing URLs: [`extension/store/submission/STORE_LISTING_URLS.txt`](extension/store/submission/STORE_LISTING_URLS.txt)
 - Permission paste text: [`extension/store/submission/PERMISSION_JUSTIFICATIONS.txt`](extension/store/submission/PERMISSION_JUSTIFICATIONS.txt)

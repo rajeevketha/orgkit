@@ -24,6 +24,19 @@ import {
   findDependentPairs,
   buildDependentMap
 } from "../lib/describe-browser.js";
+import {
+  objectKind,
+  objectKindClass,
+  filterSchemaObjects,
+  extractParentRelations,
+  extractChildRelations,
+  buildObjectQuery,
+  buildParentPathQuery,
+  buildChildSubquery,
+  schemaSummary,
+  scoreSchemaObject,
+  pickDisplayFields
+} from "../lib/schema-explorer.js";
 import { METADATA_SEARCH_TYPES, lightningBaseFromOrg } from "../lib/metadata-open.js";
 import { PACKAGE_TYPES, buildPackageXml, packageVersion } from "../lib/package-xml.js";
 import { buildFieldReferenceHint } from "../lib/flow-cleaner.js";
@@ -93,6 +106,11 @@ const FEATURES = [
     blurb: "Plain English → runnable SOQL / Tooling",
     featured: true
   },
+  {
+    id: "schema",
+    title: "Schema Explorer",
+    blurb: "Parent/child map for standard, custom & metadata"
+  },
   { id: "soql-run", title: "SOQL Runner", blurb: "Query standard & custom objects" },
   { id: "anon-apex", title: "Anonymous Apex", blurb: "Run Apex and view debug output" },
   { id: "describe", title: "Describe Browser", blurb: "Fields & dependencies for any object" },
@@ -116,6 +134,7 @@ const FEATURES = [
 const TITLES = {
   home: "Session Workbench",
   describe: "Describe Browser",
+  schema: "Schema Explorer",
   "org-compare": "Org Compare",
   "meta-open": "Metadata Quick Open",
   package: "Package.xml Builder",
@@ -175,6 +194,11 @@ const state = {
   describeObjects: [],
   describe: null,
   describeFields: [],
+  schemaFilter: "all",
+  schemaDescribe: null,
+  schemaParents: [],
+  schemaChildren: [],
+  schemaTrail: [],
   packageSelections: [],
   packageMembersCache: [],
   lastPackageXml: "",
@@ -226,6 +250,7 @@ async function init() {
   renderFeatureGrid();
   bindNav();
   bindNlExamples();
+  bindSchemaExplorer();
   bindWorkbench();
   bindFeatureActions();
   bindUtilityActions();
@@ -332,7 +357,7 @@ function showView(id) {
   if (id === "home") {
     refreshWorkbench().catch(() => {});
   }
-  if (id === "describe" || id === "perms") {
+  if (id === "describe" || id === "perms" || id === "schema") {
     preloadGlobalObjects().catch(() => {});
   }
   if (id === "soql-run") {
@@ -497,6 +522,15 @@ function resumeActivity(row) {
   if (row.type === "apex" || row.view === "anon-apex") {
     if (payload.apex) $("#anonApexInput").value = payload.apex;
     showView("anon-apex");
+    return;
+  }
+  if (row.view === "schema") {
+    if (payload.sobject) {
+      const search = $("#schemaObjectSearch");
+      if (search) search.value = payload.sobject;
+    }
+    showView("schema");
+    if (payload.sobject) onLoadSchema({ resetTrail: true, sobject: payload.sobject }).catch(() => {});
     return;
   }
   if (row.type === "describe" || row.view === "describe") {
@@ -1193,6 +1227,11 @@ async function switchActiveSession(orgKey) {
     state.describe = null;
     state.describeFields = [];
     state.describeObjects = [];
+    state.schemaDescribe = null;
+    state.schemaParents = [];
+    state.schemaChildren = [];
+    state.schemaTrail = [];
+    state.globalObjects = null;
     state.lastQueryTables = { soql: null, nl: null };
     state.lastQueryRecords = { soql: null, nl: null };
   }
@@ -2110,16 +2149,389 @@ function normalizeDescribeObjects(sobjects) {
 function fillDescribeObjectDatalist(sobjects) {
   state.describeObjects = normalizeDescribeObjects(sobjects);
   const list = $("#describeObjectList");
-  if (!list) return;
-  // Include every standard + custom object (no 500 cap) so custom APIs are searchable.
-  list.innerHTML = state.describeObjects
-    .map((o) => `<option value="${escapeHtml(o.name)}" label="${escapeHtml(o.label)}"></option>`)
-    .join("");
+  if (list) {
+    // Include every standard + custom object (no 500 cap) so custom APIs are searchable.
+    list.innerHTML = state.describeObjects
+      .map((o) => `<option value="${escapeHtml(o.name)}" label="${escapeHtml(o.label)}"></option>`)
+      .join("");
+  }
   const summary = $("#describeObjectHint");
   if (summary) {
     const customCount = state.describeObjects.filter((o) => o.custom).length;
     summary.textContent = `${state.describeObjects.length} objects loaded (${customCount} custom) — search by API name or label.`;
   }
+  fillSchemaObjectDatalist();
+}
+
+function fillSchemaObjectDatalist() {
+  const list = $("#schemaObjectList");
+  const hint = $("#schemaObjectHint");
+  const filtered = filterSchemaObjects(
+    (state.globalObjects || state.describeObjects || []).map((s) =>
+      typeof s === "string"
+        ? { name: s, label: s, custom: /__c$|__mdt$/i.test(s), queryable: true }
+        : s
+    ),
+    state.schemaFilter || "all"
+  );
+  const normalized = normalizeDescribeObjects(filtered);
+  if (list) {
+    list.innerHTML = normalized
+      .map((o) => `<option value="${escapeHtml(o.name)}" label="${escapeHtml(o.label)}"></option>`)
+      .join("");
+  }
+  if (hint) {
+    const mdt = normalized.filter((o) => /__mdt$/i.test(o.name)).length;
+    const custom = normalized.filter((o) => /__c$/i.test(o.name)).length;
+    hint.textContent = `${normalized.length} objects in filter · ${custom} custom (__c) · ${mdt} metadata (__mdt)`;
+  }
+}
+
+function bindSchemaExplorer() {
+  $("#loadSchema")?.addEventListener("click", () => onLoadSchema().catch(() => {}));
+  $("#schemaObjectSearch")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") onLoadSchema().catch(() => {});
+  });
+  document.querySelectorAll("[data-schema-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.schemaFilter = btn.getAttribute("data-schema-filter") || "all";
+      document.querySelectorAll("[data-schema-filter]").forEach((b) => {
+        b.classList.toggle("active", b === btn);
+      });
+      fillSchemaObjectDatalist();
+      renderSchemaObjectSuggest();
+    });
+  });
+  const input = $("#schemaObjectSearch");
+  const host = $("#schemaObjectSuggest");
+  if (input && host) {
+    const paint = () => renderSchemaObjectSuggest();
+    input.addEventListener("input", paint);
+    input.addEventListener("focus", paint);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") hideSchemaObjectSuggest();
+    });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest?.("#schemaObjectSearch") && !e.target.closest?.("#schemaObjectSuggest")) {
+        hideSchemaObjectSuggest();
+      }
+    });
+  }
+}
+
+function hideSchemaObjectSuggest() {
+  const host = $("#schemaObjectSuggest");
+  if (!host) return;
+  host.classList.add("hidden");
+  host.replaceChildren();
+}
+
+function schemaObjectUniverse() {
+  const raw = state.globalObjects?.length ? state.globalObjects : state.describeObjects || [];
+  return filterSchemaObjects(
+    raw.map((s) =>
+      typeof s === "string"
+        ? { name: s, label: s, custom: /__c$|__mdt$/i.test(s), queryable: true }
+        : s
+    ),
+    state.schemaFilter || "all"
+  );
+}
+
+function renderSchemaObjectSuggest() {
+  const input = $("#schemaObjectSearch");
+  const host = $("#schemaObjectSuggest");
+  if (!input || !host) return;
+  const q = (input.value || "").trim();
+  if (!q) {
+    hideSchemaObjectSuggest();
+    return;
+  }
+  const scored = [];
+  for (const o of schemaObjectUniverse()) {
+    const score = scoreSchemaObject(o, q);
+    if (score > 0) scored.push({ o, score });
+  }
+  scored.sort((a, b) => b.score - a.score || String(a.o.name).localeCompare(String(b.o.name)));
+  const top = scored.slice(0, 12);
+  if (!top.length) {
+    hideSchemaObjectSuggest();
+    return;
+  }
+  host.classList.remove("hidden");
+  host.innerHTML = top
+    .map(({ o }) => {
+      const kind = objectKind(o.name, !!o.custom);
+      return `<button type="button" class="soql-suggest-item" role="option" data-name="${escapeHtml(o.name)}">
+        <strong>${escapeHtml(o.name)}</strong>
+        <span>${escapeHtml(o.label || o.name)} · ${escapeHtml(kind)}</span>
+      </button>`;
+    })
+    .join("");
+  host.querySelectorAll("[data-name]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      input.value = btn.getAttribute("data-name") || "";
+      hideSchemaObjectSuggest();
+      onLoadSchema({ resetTrail: true }).catch(() => {});
+    });
+  });
+}
+
+async function onLoadSchema({ resetTrail = true, sobject: forced } = {}) {
+  const input = $("#schemaObjectSearch");
+  const sobject = String(forced || input?.value || "").trim();
+  if (!sobject) return;
+  hideSchemaObjectSuggest();
+  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(sobject)) {
+    $("#schemaSummary").textContent = "Invalid object API name.";
+    return;
+  }
+  if (input) input.value = sobject;
+  $("#schemaSummary").textContent = "Loading schema…";
+  $("#schemaCanvas")?.classList.add("hidden");
+  $("#schemaSoqlPreview")?.classList.add("hidden");
+  try {
+    const res = await send("describeSObject", {
+      tabUrl: await requireTabUrl(),
+      sobject,
+      apiVersion: apiVersion()
+    });
+    if (!res.ok) throw new Error(res.error);
+    const describe = res.result;
+    state.schemaDescribe = describe;
+    state.schemaParents = extractParentRelations(describe);
+    state.schemaChildren = extractChildRelations(describe);
+    if (resetTrail) {
+      state.schemaTrail = [{ name: describe.name, label: describe.label || describe.name }];
+    } else {
+      const last = state.schemaTrail[state.schemaTrail.length - 1];
+      if (!last || last.name !== describe.name) {
+        state.schemaTrail = [
+          ...state.schemaTrail,
+          { name: describe.name, label: describe.label || describe.name }
+        ].slice(-12);
+      }
+    }
+    $("#schemaSummary").textContent = schemaSummary(describe);
+    renderSchemaExplorer();
+    $("#schemaCanvas")?.classList.remove("hidden");
+    await trackActivity({
+      type: "describe",
+      title: `Schema: ${describe.name}`,
+      detail: schemaSummary(describe),
+      view: "schema",
+      payload: { sobject: describe.name }
+    });
+  } catch (e) {
+    $("#schemaSummary").textContent = e.message || String(e);
+  }
+}
+
+function renderSchemaExplorer() {
+  const describe = state.schemaDescribe;
+  if (!describe) return;
+  renderSchemaBreadcrumb();
+  renderSchemaCenter(describe);
+  renderSchemaParents(state.schemaParents || []);
+  renderSchemaChildren(state.schemaChildren || []);
+  renderSchemaActions(describe);
+}
+
+function renderSchemaBreadcrumb() {
+  const nav = $("#schemaBreadcrumb");
+  if (!nav) return;
+  const trail = state.schemaTrail || [];
+  if (trail.length <= 1) {
+    nav.innerHTML = trail.length
+      ? `<span class="schema-crumb current">${escapeHtml(trail[0].name)}</span>`
+      : "";
+    return;
+  }
+  nav.innerHTML = trail
+    .map((t, i) => {
+      const current = i === trail.length - 1;
+      if (current) {
+        return `<span class="schema-crumb current">${escapeHtml(t.name)}</span>`;
+      }
+      return `<button type="button" class="schema-crumb linkish" data-schema-hop="${escapeHtml(t.name)}" data-trail-index="${i}">${escapeHtml(t.name)}</button>`;
+    })
+    .join('<span class="schema-crumb-sep">→</span>');
+  nav.querySelectorAll("[data-schema-hop]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const name = btn.getAttribute("data-schema-hop");
+      const idx = Number(btn.getAttribute("data-trail-index"));
+      if (!name) return;
+      if (Number.isFinite(idx)) state.schemaTrail = state.schemaTrail.slice(0, idx + 1);
+      onLoadSchema({ resetTrail: false, sobject: name }).catch(() => {});
+    });
+  });
+}
+
+function renderSchemaCenter(describe) {
+  const el = $("#schemaCenter");
+  if (!el) return;
+  const kind = objectKind(describe.name, !!describe.custom);
+  const fields = pickDisplayFields(describe);
+  const fieldCount = describe.fields?.length || 0;
+  el.innerHTML = `
+    <div class="schema-node schema-node-center ${objectKindClass(kind)}">
+      <span class="schema-kind">${escapeHtml(kind)}</span>
+      <strong>${escapeHtml(describe.name)}</strong>
+      <span class="schema-node-meta">${escapeHtml(describe.label || describe.name)}</span>
+      <span class="schema-node-meta">${fieldCount} fields · keyPrefix ${escapeHtml(describe.keyPrefix || "—")}</span>
+      <span class="schema-node-meta">Sample: ${escapeHtml(fields.join(", "))}</span>
+    </div>`;
+}
+
+function renderSchemaParents(parents) {
+  const root = $("#schemaParents");
+  if (!root) return;
+  if (!parents.length) {
+    root.innerHTML = `<p class="hint">No parent lookups on this object.</p>`;
+    return;
+  }
+  root.innerHTML = parents
+    .map((p, i) => {
+      const kind = objectKind(p.targetObject);
+      return `<button type="button" class="schema-node ${objectKindClass(kind)}" data-schema-parent="${i}">
+        <span class="schema-kind">${escapeHtml(kind)}</span>
+        <strong>${escapeHtml(p.targetObject)}</strong>
+        <span class="schema-node-meta">${escapeHtml(p.fieldName)}${p.relationshipName ? ` · ${escapeHtml(p.relationshipName)}` : ""}</span>
+        <span class="schema-node-meta">${escapeHtml(p.type)}${p.nillable ? "" : " · required"}</span>
+      </button>`;
+    })
+    .join("");
+  root.querySelectorAll("[data-schema-parent]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const p = parents[Number(btn.getAttribute("data-schema-parent"))];
+      if (!p) return;
+      onLoadSchema({ resetTrail: false, sobject: p.targetObject }).catch(() => {});
+    });
+    btn.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      const p = parents[Number(btn.getAttribute("data-schema-parent"))];
+      if (!p || !state.schemaDescribe) return;
+      const soql = buildParentPathQuery(state.schemaDescribe, p);
+      previewSchemaSoql(soql);
+    });
+  });
+}
+
+function renderSchemaChildren(children) {
+  const root = $("#schemaChildren");
+  if (!root) return;
+  if (!children.length) {
+    root.innerHTML = `<p class="hint">No child relationships returned for this object.</p>`;
+    return;
+  }
+  root.innerHTML = children
+    .map((c, i) => {
+      const kind = objectKind(c.childObject);
+      const rel = c.relationshipName || "(no relationship name)";
+      return `<button type="button" class="schema-node ${objectKindClass(kind)}" data-schema-child="${i}">
+        <span class="schema-kind">${escapeHtml(kind)}</span>
+        <strong>${escapeHtml(c.childObject)}</strong>
+        <span class="schema-node-meta">${escapeHtml(rel)}</span>
+        <span class="schema-node-meta">via ${escapeHtml(c.fieldName || "—")}${c.cascadeDelete ? " · cascade" : ""}</span>
+      </button>`;
+    })
+    .join("");
+  root.querySelectorAll("[data-schema-child]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const c = children[Number(btn.getAttribute("data-schema-child"))];
+      if (!c) return;
+      onLoadSchema({ resetTrail: false, sobject: c.childObject }).catch(() => {});
+    });
+    btn.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      const c = children[Number(btn.getAttribute("data-schema-child"))];
+      if (!c || !state.schemaDescribe) return;
+      const soql = buildChildSubquery(state.schemaDescribe, c);
+      if (soql) previewSchemaSoql(soql);
+      else previewSchemaSoql(`-- Child ${c.childObject} has no relationshipName for subqueries`);
+    });
+  });
+}
+
+function renderSchemaActions(describe) {
+  const root = $("#schemaActions");
+  if (!root) return;
+  root.innerHTML = `
+    <button type="button" class="btn primary" id="schemaQueryObject">Query this object</button>
+    <button type="button" class="btn" id="schemaOpenDescribe">Open in Describe</button>
+    <button type="button" class="btn" id="schemaSendNl">Ask NL → SOQL</button>
+    <button type="button" class="btn ghost" id="schemaCopyName">Copy API name</button>
+  `;
+  $("#schemaQueryObject")?.addEventListener("click", () => {
+    const soql = buildObjectQuery(describe);
+    openSoqlWithQuery(soql);
+  });
+  $("#schemaOpenDescribe")?.addEventListener("click", () => {
+    const search = $("#describeObjectSearch");
+    if (search) search.value = describe.name;
+    showView("describe");
+    onLoadDescribe().catch(() => {});
+  });
+  $("#schemaSendNl")?.addEventListener("click", () => {
+    const kind = objectKind(describe.name, !!describe.custom);
+    const nl = $("#nlInput");
+    if (nl) {
+      nl.value = `Show recent ${describe.name} records (${kind})${
+        state.schemaParents?.[0]
+          ? ` including related ${state.schemaParents[0].targetObject}`
+          : ""
+      }`;
+    }
+    showView("nl-soql");
+  });
+  $("#schemaCopyName")?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(describe.name);
+    } catch {
+      /* ignore */
+    }
+  });
+
+  // Parent/child quick query buttons under lists when relations exist
+  if (state.schemaParents?.length) {
+    const first = state.schemaParents[0];
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.textContent = `Query via ${first.relationshipName || first.fieldName}`;
+    btn.addEventListener("click", () => {
+      const soql = buildParentPathQuery(describe, first);
+      openSoqlWithQuery(soql);
+    });
+    root.appendChild(btn);
+  }
+  const childWithRel = (state.schemaChildren || []).find((c) => c.relationshipName);
+  if (childWithRel) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.textContent = `Child subquery (${childWithRel.relationshipName})`;
+    btn.addEventListener("click", () => {
+      const soql = buildChildSubquery(describe, childWithRel);
+      if (soql) openSoqlWithQuery(soql);
+    });
+    root.appendChild(btn);
+  }
+}
+
+function previewSchemaSoql(soql) {
+  const pre = $("#schemaSoqlPreview");
+  if (!pre) return;
+  pre.textContent = soql || "";
+  pre.classList.toggle("hidden", !soql);
+}
+
+function openSoqlWithQuery(soql) {
+  if (!soql) return;
+  previewSchemaSoql(soql);
+  const input = $("#soqlInput");
+  if (input) input.value = soql;
+  showView("soql-run");
 }
 
 function fillPermObjectDatalist(sobjects) {

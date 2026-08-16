@@ -43,6 +43,7 @@
 
     <div class="wb-launch" id="wbLaunch">
       <button type="button" class="btn primary" data-open="nl-soql">NL → SOQL</button>
+      <button type="button" class="btn" data-open="schema">Schema</button>
       <button type="button" class="btn" data-open="soql-run">SOQL</button>
       <button type="button" class="btn" data-open="anon-apex">Anon Apex</button>
       <button type="button" class="btn" data-open="describe">Describe</button>
@@ -259,6 +260,54 @@
     <div id="describeFields" class="describe-list"></div>
     <div id="describeDetail" class="report"></div>
     <div id="describeDependent" class="report"></div>
+  </section>
+
+  <!-- FEATURE: Schema Explorer -->
+  <section id="view-schema" class="view">
+    <p class="lede">
+      Explore parent and child relationships like Schema Builder — standard objects, custom objects (<code>__c</code>), and custom metadata (<code>__mdt</code>).
+    </p>
+    <div class="schema-filter-row" role="group" aria-label="Object type filter">
+      <button type="button" class="schema-filter active" data-schema-filter="all">All</button>
+      <button type="button" class="schema-filter" data-schema-filter="standard">Standard</button>
+      <button type="button" class="schema-filter" data-schema-filter="custom">Custom (__c)</button>
+      <button type="button" class="schema-filter" data-schema-filter="mdt">Metadata (__mdt)</button>
+    </div>
+    <div class="row" style="position:relative">
+      <div class="soql-editor grow" style="flex:1;min-width:0">
+        <input
+          type="search"
+          id="schemaObjectSearch"
+          class="input grow"
+          list="schemaObjectList"
+          placeholder="Search any object — Account, MyObj__c, Setting__mdt…"
+          autocomplete="off"
+          style="width:100%"
+        />
+        <div id="schemaObjectSuggest" class="soql-suggest hidden" role="listbox" aria-label="Schema object suggestions"></div>
+      </div>
+      <button type="button" class="btn primary" id="loadSchema">Explore</button>
+    </div>
+    <datalist id="schemaObjectList"></datalist>
+    <p class="hint" id="schemaObjectHint">Loads all org objects (including custom and custom metadata).</p>
+    <nav id="schemaBreadcrumb" class="schema-breadcrumb" aria-label="Schema navigation"></nav>
+    <div id="schemaSummary" class="hint"></div>
+    <div id="schemaCanvas" class="schema-canvas hidden" aria-live="polite">
+      <div class="schema-col">
+        <div class="schema-col-title">Parents</div>
+        <div id="schemaParents" class="schema-node-list"></div>
+      </div>
+      <div class="schema-col schema-col-center">
+        <div class="schema-col-title">Current object</div>
+        <div id="schemaCenter" class="schema-center-card"></div>
+        <div class="schema-actions" id="schemaActions"></div>
+      </div>
+      <div class="schema-col">
+        <div class="schema-col-title">Children</div>
+        <div id="schemaChildren" class="schema-node-list"></div>
+      </div>
+    </div>
+    <pre id="schemaSoqlPreview" class="result schema-soql-preview hidden"></pre>
   </section>
 
   <!-- FEATURE: Org Compare -->
