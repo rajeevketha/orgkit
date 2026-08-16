@@ -3,51 +3,155 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OrgKit Schema Builder — canvas demo</title>
+  <title>OrgKit Schema Builder — 1.9.3 demo</title>
   <link rel="stylesheet" href="../app/app.css" />
   <style>
-    body { padding: 16px; min-height: 100vh; overflow: auto; height: auto; width: auto; display: block; }
-    h1 { margin: 0 0 6px; font-size: 18px; }
-    .note { color: var(--muted); margin: 0 0 12px; }
+    body {
+      padding: 16px 20px 28px;
+      min-height: 100vh;
+      overflow: auto;
+      height: auto;
+      width: auto;
+      display: block;
+      background:
+        radial-gradient(1200px 500px at 10% -10%, rgba(1, 118, 211, 0.18), transparent 55%),
+        radial-gradient(900px 400px at 90% 0%, rgba(224, 122, 95, 0.1), transparent 50%),
+        var(--bg);
+    }
+    .demo-top { max-width: 1280px; margin: 0 auto 12px; }
+    h1 { margin: 0 0 4px; font-size: 20px; letter-spacing: -0.02em; }
+    .note { color: var(--muted); margin: 0 0 10px; max-width: 70ch; }
+    .feature-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 0 0 12px;
+    }
+    .feature-chip {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11.5px;
+      color: #9ec9ff;
+      background: rgba(15, 28, 46, 0.55);
+    }
+    .feature-chip strong { color: var(--text); font-weight: 600; }
+    .demo-shell {
+      max-width: 1280px;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(10, 18, 30, 0.72);
+    }
+    .schema-builder { border: 0; border-radius: 0; }
+    .schema-viewport { height: min(62vh, 560px); }
+    #schemaFieldMenu { z-index: 100; }
+    .tour-badge {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      color: #9ec9ff;
+      border: 1px solid rgba(1, 118, 211, 0.45);
+      background: rgba(1, 118, 211, 0.14);
+      vertical-align: middle;
+    }
   </style>
 </head>
 <body>
-  <h1>Schema Builder canvas demo</h1>
-  <p class="note">Same card + relationship-line UI as OrgKit 1.9.1 — sample Account graph (no Salesforce login required).</p>
-  <div class="schema-builder" id="schemaBuilder">
-    <div class="schema-builder-toolbar">
-      <span class="hint" style="margin:0">Drag to pan · scroll to zoom · click a card header to focus</span>
-      <div class="row wrap" style="margin:0;gap:6px">
-        <button type="button" class="btn ghost" id="schemaZoomOut">−</button>
-        <button type="button" class="btn ghost" id="schemaZoomReset">Reset</button>
-        <button type="button" class="btn ghost" id="schemaZoomIn">+</button>
-      </div>
+  <div class="demo-top">
+    <h1>OrgKit Schema Builder <span class="tour-badge">1.9.3</span></h1>
+    <p class="note">
+      Interactive canvas demo (no Salesforce login). Shows cards, relationship lines, session CRUD/FLS,
+      as-user overlay, field menus, and edge-click SOQL — same UI as the extension.
+    </p>
+    <div class="feature-strip" aria-label="Feature highlights">
+      <span class="feature-chip"><strong>Canvas</strong> pan · zoom · focus hop</span>
+      <span class="feature-chip"><strong>Permissions</strong> session CRUD / FLS</span>
+      <span class="feature-chip"><strong>As user</strong> overlay another user’s access</span>
+      <span class="feature-chip"><strong>Field menu</strong> copy · SELECT · open parent</span>
+      <span class="feature-chip"><strong>Edge click</strong> parent path / child subquery</span>
     </div>
-    <div class="schema-viewport" id="schemaViewport">
-      <div class="schema-world" id="schemaWorld">
-        <svg class="schema-lines" id="schemaLines" xmlns="http://www.w3.org/2000/svg"></svg>
-        <div class="schema-cards" id="schemaCards"></div>
-      </div>
-    </div>
-    <div class="schema-actions" id="schemaActions"></div>
   </div>
-  <pre id="soql" class="result" style="margin-top:12px"></pre>
+
+  <div class="demo-shell">
+    <div class="schema-builder" id="schemaBuilder">
+      <div class="schema-builder-toolbar">
+        <span class="hint" style="margin:0">Drag canvas to pan · scroll to zoom · click field/line for actions</span>
+        <div class="row wrap" style="margin:0;gap:6px">
+          <button type="button" class="btn ghost active" id="schemaTogglePerms" title="Permissions drawer">Permissions</button>
+          <button type="button" class="btn ghost" id="schemaZoomOut" title="Zoom out">−</button>
+          <button type="button" class="btn ghost" id="schemaZoomReset" title="Reset view">Reset</button>
+          <button type="button" class="btn ghost" id="schemaZoomIn" title="Zoom in">+</button>
+        </div>
+      </div>
+      <div class="schema-builder-body">
+        <div class="schema-viewport" id="schemaViewport">
+          <div class="schema-world" id="schemaWorld">
+            <svg class="schema-lines" id="schemaLines" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div class="schema-cards" id="schemaCards"></div>
+          </div>
+        </div>
+        <aside class="schema-perm-drawer" id="schemaPermDrawer">
+          <div class="schema-perm-drawer-head">
+            <strong>Permissions</strong>
+            <button type="button" class="btn ghost" id="schemaPermClose" title="Close">×</button>
+          </div>
+          <div id="schemaPermBody" class="schema-perm-body"></div>
+        </aside>
+      </div>
+      <div class="schema-actions" id="schemaActions"></div>
+    </div>
+  </div>
+
+  <div class="demo-top" style="margin-top:12px">
+    <pre id="schemaSoqlPreview" class="result schema-soql-preview" style="margin:0"></pre>
+  </div>
+  <div id="schemaFieldMenu" class="schema-field-menu hidden" role="menu" hidden></div>
+
   <script type="module">
     import {
-      objectKind, objectKindClass, extractParentRelations, extractChildRelations,
-      formatFieldType, pickCardFields, layoutSchemaGraph, buildGraphEdges, buildObjectQuery
+      objectKind,
+      objectKindClass,
+      extractParentRelations,
+      extractChildRelations,
+      formatFieldType,
+      pickCardFields,
+      layoutSchemaGraph,
+      buildGraphEdges,
+      buildObjectQuery,
+      buildParentPathQuery,
+      buildChildSubquery,
+      sessionObjectAccess,
+      fieldSchemaBadges,
+      summarizeSessionPermissions,
+      crudStripHtml,
+      buildUserPermOverlay
     } from "../lib/schema-explorer.js";
+
+    const $ = (sel) => document.querySelector(sel);
 
     const DESCRIBES = {
       Account: {
-        name: "Account", label: "Account", custom: false, keyPrefix: "001",
+        name: "Account",
+        label: "Account",
+        custom: false,
+        createable: true,
+        updateable: true,
+        deletable: true,
+        queryable: true,
+        retrieveable: true,
         fields: [
-          { name: "Id", type: "id", label: "Account ID" },
-          { name: "Name", type: "string", length: 255, label: "Account Name", nillable: false, createable: true },
-          { name: "Phone", type: "phone", label: "Account Phone" },
-          { name: "OwnerId", label: "Owner", type: "reference", relationshipName: "Owner", referenceTo: ["User"], nillable: false, createable: true },
-          { name: "ParentId", label: "Parent Account", type: "reference", relationshipName: "Parent", referenceTo: ["Account"], nillable: true, createable: true },
-          { name: "Industry", type: "picklist", label: "Industry" }
+          { name: "Id", type: "id", label: "Account ID", updateable: false },
+          { name: "Name", type: "string", length: 255, label: "Account Name", nillable: false, createable: true, updateable: true },
+          { name: "Phone", type: "phone", label: "Account Phone", updateable: true },
+          { name: "OwnerId", label: "Owner", type: "reference", relationshipName: "Owner", referenceTo: ["User"], nillable: false, createable: true, updateable: true },
+          { name: "ParentId", label: "Parent Account", type: "reference", relationshipName: "Parent", referenceTo: ["Account"], nillable: true, createable: true, updateable: true },
+          { name: "Industry", type: "picklist", label: "Industry", updateable: true },
+          { name: "AnnualRevenue", type: "currency", label: "Annual Revenue", updateable: true },
+          { name: "Secret_Score__c", type: "double", label: "Secret Score", custom: true, updateable: true, accessible: false }
         ],
         childRelationships: [
           { childSObject: "Contact", field: "AccountId", relationshipName: "Contacts" },
@@ -56,134 +160,410 @@
         ]
       },
       User: {
-        name: "User", label: "User", custom: false,
+        name: "User",
+        label: "User",
+        custom: false,
+        createable: false,
+        updateable: true,
+        deletable: false,
+        queryable: true,
+        retrieveable: true,
         fields: [
-          { name: "Id", type: "id", label: "User ID" },
-          { name: "Name", type: "string", length: 121, label: "Full Name" },
-          { name: "Username", type: "string", length: 80, label: "Username" },
-          { name: "Email", type: "email", label: "Email" }
+          { name: "Id", type: "id", label: "User ID", updateable: false },
+          { name: "Name", type: "string", length: 121, label: "Full Name", updateable: true },
+          { name: "Username", type: "string", length: 80, label: "Username", updateable: true },
+          { name: "Email", type: "email", label: "Email", updateable: true }
         ],
         childRelationships: []
       },
       Contact: {
-        name: "Contact", label: "Contact", custom: false,
+        name: "Contact",
+        label: "Contact",
+        custom: false,
+        createable: true,
+        updateable: true,
+        deletable: true,
+        queryable: true,
+        retrieveable: true,
         fields: [
-          { name: "Id", type: "id", label: "Contact ID" },
-          { name: "Name", type: "string", length: 121, label: "Full Name" },
-          { name: "AccountId", label: "Account", type: "reference", relationshipName: "Account", referenceTo: ["Account"], nillable: true, createable: true },
-          { name: "Email", type: "email", label: "Email" },
-          { name: "Phone", type: "phone", label: "Business Phone" }
+          { name: "Id", type: "id", label: "Contact ID", updateable: false },
+          { name: "Name", type: "string", length: 121, label: "Full Name", updateable: true },
+          { name: "AccountId", label: "Account", type: "reference", relationshipName: "Account", referenceTo: ["Account"], nillable: true, createable: true, updateable: true },
+          { name: "Email", type: "email", label: "Email", updateable: true },
+          { name: "Phone", type: "phone", label: "Business Phone", updateable: true }
         ],
         childRelationships: []
       },
       Opportunity: {
-        name: "Opportunity", label: "Opportunity", custom: false,
+        name: "Opportunity",
+        label: "Opportunity",
+        custom: false,
+        createable: true,
+        updateable: true,
+        deletable: true,
+        queryable: true,
+        retrieveable: true,
         fields: [
-          { name: "Id", type: "id", label: "Opportunity ID" },
-          { name: "Name", type: "string", length: 120, label: "Name", nillable: false, createable: true },
-          { name: "AccountId", label: "Account", type: "reference", relationshipName: "Account", referenceTo: ["Account"] },
-          { name: "Amount", type: "currency", precision: 16, scale: 2, label: "Amount" },
-          { name: "StageName", type: "picklist", label: "Stage" }
+          { name: "Id", type: "id", label: "Opportunity ID", updateable: false },
+          { name: "Name", type: "string", length: 120, label: "Name", nillable: false, createable: true, updateable: true },
+          { name: "AccountId", label: "Account", type: "reference", relationshipName: "Account", referenceTo: ["Account"], updateable: true },
+          { name: "Amount", type: "currency", precision: 16, scale: 2, label: "Amount", updateable: true },
+          { name: "StageName", type: "picklist", label: "Stage", updateable: true }
         ],
         childRelationships: []
       },
       Job__c: {
-        name: "Job__c", label: "Job", custom: true,
+        name: "Job__c",
+        label: "Job",
+        custom: true,
+        createable: true,
+        updateable: true,
+        deletable: false,
+        queryable: true,
+        retrieveable: true,
         fields: [
-          { name: "Id", type: "id", label: "Record ID" },
-          { name: "Name", type: "string", length: 80, label: "Job Name", nillable: false, createable: true },
-          { name: "Account__c", label: "Account", type: "reference", relationshipName: "Account__r", referenceTo: ["Account"] },
-          { name: "Status__c", type: "picklist", label: "Status" }
+          { name: "Id", type: "id", label: "Record ID", updateable: false },
+          { name: "Name", type: "string", length: 80, label: "Job Name", nillable: false, createable: true, updateable: true },
+          { name: "Account__c", label: "Account", type: "reference", relationshipName: "Account__r", referenceTo: ["Account"], updateable: true },
+          { name: "Status__c", type: "picklist", label: "Status", custom: true, updateable: true }
         ],
         childRelationships: []
       }
     };
 
-    let center = "Account";
-    let view = { x: 40, y: 20, scale: 0.92 };
+    /** Demo as-user profiles (stand-in for ObjectPermissions + FieldPermissions). */
+    const DEMO_USERS = {
+      "rep@example.com": {
+        Id: "005REPxxxxxxxxxx",
+        Name: "Sales Rep",
+        Username: "rep@example.com",
+        byObject: {
+          Account: {
+            objectPerms: [{ PermissionsCreate: true, PermissionsRead: true, PermissionsEdit: true, PermissionsDelete: false }],
+            fieldPerms: [
+              { Field: "Account.Name", PermissionsRead: true, PermissionsEdit: true },
+              { Field: "Account.Phone", PermissionsRead: true, PermissionsEdit: true },
+              { Field: "Account.OwnerId", PermissionsRead: true, PermissionsEdit: false },
+              { Field: "Account.ParentId", PermissionsRead: true, PermissionsEdit: false },
+              { Field: "Account.Industry", PermissionsRead: true, PermissionsEdit: true },
+              { Field: "Account.AnnualRevenue", PermissionsRead: true, PermissionsEdit: false },
+              { Field: "Account.Secret_Score__c", PermissionsRead: false, PermissionsEdit: false }
+            ]
+          }
+        }
+      },
+      "readonly@example.com": {
+        Id: "005RODxxxxxxxxxx",
+        Name: "Read Only",
+        Username: "readonly@example.com",
+        byObject: {
+          Account: {
+            objectPerms: [{ PermissionsCreate: false, PermissionsRead: true, PermissionsEdit: false, PermissionsDelete: false }],
+            fieldPerms: [
+              { Field: "Account.Name", PermissionsRead: true, PermissionsEdit: false },
+              { Field: "Account.Phone", PermissionsRead: true, PermissionsEdit: false },
+              { Field: "Account.OwnerId", PermissionsRead: true, PermissionsEdit: false },
+              { Field: "Account.Industry", PermissionsRead: true, PermissionsEdit: false },
+              { Field: "Account.Secret_Score__c", PermissionsRead: false, PermissionsEdit: false }
+            ]
+          }
+        }
+      }
+    };
 
-    function applyTransform() {
-      document.getElementById("schemaWorld").style.transform =
-        `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+    const state = {
+      center: "Account",
+      view: { x: 36, y: 18, scale: 0.88 },
+      drawerOpen: true,
+      asUserKey: "",
+      asUser: null,
+      overlays: {},
+      highlightedEdgeId: "",
+      edges: []
+    };
+
+    function escapeHtml(s) {
+      return String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
     }
 
-    function render(name) {
-      center = name;
-      const describe = DESCRIBES[name];
-      const parents = extractParentRelations(describe);
-      const children = extractChildRelations(describe);
-      const parentNames = [...new Set(parents.map((p) => p.targetObject))].filter((n) => DESCRIBES[n]).slice(0, 6);
-      const childNames = [...new Set(children.map((c) => c.childObject))].filter((n) => DESCRIBES[n] && n !== name).slice(0, 8);
-      const positions = layoutSchemaGraph({ centerName: name, parentNames, childNames, cardWidth: 268, gapX: 40, gapY: 80, centerY: 300 });
-      let minX = Infinity, minY = Infinity;
-      for (const p of positions.values()) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); }
-      const ox = 40 - minX, oy = 40 - minY;
-      const host = document.getElementById("schemaCards");
-      host.replaceChildren();
-      for (const [obj, pos] of positions) {
-        const d = DESCRIBES[obj];
-        const kind = objectKind(d.name, !!d.custom);
-        const fields = pickCardFields(d, { max: obj === name ? 12 : 8 });
-        const card = document.createElement("div");
-        card.className = `sb-card ${objectKindClass(kind)}${obj === name ? " is-center" : ""}`;
-        card.dataset.object = obj;
-        card.style.left = `${pos.x + ox}px`;
-        card.style.top = `${pos.y + oy}px`;
-        card.innerHTML = `
-          <div class="sb-card-head">
-            <div>
-              <span class="sb-kind">${kind}</span>
-              <strong>${d.label}</strong>
-              <span class="sb-api">${d.name}</span>
-            </div>
-          </div>
-          <div class="sb-fields">
-            ${fields.map((f) => `
-              <div class="sb-field${f.referenceTo?.length ? " is-rel" : ""}${!f.nillable && f.createable ? " is-required" : ""}" data-object="${d.name}" data-field="${f.name}">
-                <span class="sb-field-name">${f.label || f.name}</span>
-                <span class="sb-field-type">${formatFieldType(f)}</span>
-              </div>`).join("")}
-          </div>`;
-        card.querySelector(".sb-card-head").addEventListener("click", () => render(obj));
-        host.appendChild(card);
+    function applyTransform() {
+      $("#schemaWorld").style.transform = `translate(${state.view.x}px, ${state.view.y}px) scale(${state.view.scale})`;
+    }
+
+    function currentOverlay(objectName) {
+      if (!state.asUser) return null;
+      return state.overlays[objectName || state.center] || null;
+    }
+
+    function previewSoql(soql) {
+      const pre = $("#schemaSoqlPreview");
+      pre.textContent = soql || "";
+      pre.classList.toggle("hidden", !soql);
+    }
+
+    function hideFieldMenu() {
+      const menu = $("#schemaFieldMenu");
+      menu.classList.add("hidden");
+      menu.hidden = true;
+      menu.innerHTML = "";
+    }
+
+    function openFieldMenu({ field, objectName, clientX, clientY, anchorEl }) {
+      const menu = $("#schemaFieldMenu");
+      const parentTargets = Array.isArray(field.referenceTo) ? field.referenceTo.filter(Boolean) : [];
+      const edge = state.edges.find((e) => e.fromObject === objectName && e.fromField === field.name);
+      const items = [
+        { id: "copy-api", label: `Copy ${field.name}` },
+        { id: "copy-select", label: "Copy SELECT snippet" }
+      ];
+      if (edge) items.push({ id: "highlight-edge", label: "Highlight relationship line" });
+      if (parentTargets.length) {
+        items.push({ id: "query-parent", label: `Query via ${field.relationshipName || field.name}` });
+        items.push({ id: "open-parent", label: `Open ${parentTargets[0]}` });
       }
-      const edges = buildGraphEdges({
-        centerName: name,
-        parents: parents.filter((p) => parentNames.includes(p.targetObject)),
-        children: children.filter((c) => childNames.includes(c.childObject))
+      items.push({ id: "query-field", label: "Query this field" });
+
+      menu.innerHTML = items
+        .map(
+          (it) =>
+            `<button type="button" class="schema-field-menu-item" role="menuitem" data-action="${it.id}">${escapeHtml(it.label)}</button>`
+        )
+        .join("");
+      menu.classList.remove("hidden");
+      menu.hidden = false;
+
+      menu.style.left = "0px";
+      menu.style.top = "0px";
+      const rect = menu.getBoundingClientRect();
+      let x = clientX ?? anchorEl.getBoundingClientRect().left;
+      let y = clientY ?? anchorEl.getBoundingClientRect().bottom + 4;
+      x = Math.min(x, window.innerWidth - rect.width - 8);
+      y = Math.min(y, window.innerHeight - rect.height - 8);
+      menu.style.left = `${Math.max(8, x)}px`;
+      menu.style.top = `${Math.max(8, y)}px`;
+
+      menu.querySelectorAll("[data-action]").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const action = btn.getAttribute("data-action");
+          const describe = DESCRIBES[state.center];
+          hideFieldMenu();
+          if (action === "copy-api") {
+            previewSoql(`// Copied field API name\n${field.name}`);
+            return;
+          }
+          if (action === "copy-select" || action === "query-field") {
+            previewSoql(`SELECT Id, ${field.name} FROM ${objectName} LIMIT 50`);
+            return;
+          }
+          if (action === "highlight-edge" && edge) {
+            state.highlightedEdgeId = edge.id;
+            drawLines(state.edges);
+            return;
+          }
+          if (action === "query-parent" && describe) {
+            const parent =
+              extractParentRelations(describe).find((p) => p.fieldName === field.name) || {
+                fieldName: field.name,
+                relationshipName: field.relationshipName,
+                targetObject: parentTargets[0],
+                type: field.type
+              };
+            previewSoql(buildParentPathQuery(describe, parent));
+            return;
+          }
+          if (action === "open-parent" && parentTargets[0] && DESCRIBES[parentTargets[0]]) {
+            render(parentTargets[0]);
+          }
+        });
       });
-      drawLines(edges);
-      document.getElementById("schemaActions").innerHTML = `
-        <button type="button" class="btn primary" id="q">Query this object</button>
-        <span class="hint" style="margin:0">Focused: <strong>${name}</strong></span>`;
-      document.getElementById("q").onclick = () => {
-        document.getElementById("soql").textContent = buildObjectQuery(describe);
-      };
-      document.getElementById("soql").textContent = buildObjectQuery(describe);
-      applyTransform();
+    }
+
+    function renderPermDrawer(describe) {
+      const body = $("#schemaPermBody");
+      const overlay = currentOverlay(describe.name);
+      const summary = summarizeSessionPermissions(describe, overlay);
+      const { access, fieldCounts, blockedEdit } = summary;
+      const modeLabel = overlay?.mode === "user"
+        ? `user <strong>${escapeHtml(overlay.userLabel)}</strong>`
+        : "<strong>this browser session</strong>";
+      const blockedHtml = blockedEdit.length
+        ? `<ul class="schema-perm-list">${blockedEdit
+            .map((b) => `<li><code>${escapeHtml(b.name)}</code> — ${escapeHtml(b.reason || "Not editable")}</li>`)
+            .join("")}</ul>`
+        : `<p class="hint">No notable non-editable fields in the first samples.</p>`;
+
+      body.innerHTML = `
+        <div class="label" style="margin-top:0">As user (overlay)</div>
+        <div class="row wrap" style="gap:6px;margin:6px 0">
+          <input type="text" class="input grow" id="schemaAsUserInput" list="demoUsers" placeholder="Username or Id" value="${escapeHtml(state.asUserKey)}" autocomplete="off" />
+          <datalist id="demoUsers">
+            <option value="rep@example.com"></option>
+            <option value="readonly@example.com"></option>
+          </datalist>
+        </div>
+        <div class="row wrap" style="gap:6px">
+          <button type="button" class="btn primary" id="schemaAsUserLoad">Load as user</button>
+          <button type="button" class="btn ghost" id="schemaAsUserClear" ${state.asUser ? "" : "disabled"}>Clear</button>
+        </div>
+        <p class="hint" id="schemaAsUserStatus">${
+          state.asUser
+            ? `Showing permissions for ${escapeHtml(state.asUser.Username)}`
+            : "Try <code>rep@example.com</code> or <code>readonly@example.com</code>."
+        }</p>
+        <p class="hint">Effective access for ${modeLabel}.</p>
+        <div class="sb-crud-strip large">${crudStripHtml(access)}</div>
+        <div class="schema-perm-stats">
+          <div><span>${fieldCounts.total}</span> fields</div>
+          <div><span>${fieldCounts.readable}</span> readable</div>
+          <div><span>${fieldCounts.editable}</span> editable</div>
+          <div><span>${fieldCounts.required}</span> required</div>
+          <div><span>${fieldCounts.custom}</span> custom</div>
+          ${fieldCounts.notReadable ? `<div><span>${fieldCounts.notReadable}</span> not readable</div>` : ""}
+        </div>
+        <div class="label">Why some fields aren’t editable</div>
+        ${blockedHtml}
+      `;
+
+      $("#schemaAsUserLoad")?.addEventListener("click", loadAsUser);
+      $("#schemaAsUserClear")?.addEventListener("click", clearAsUser);
+      $("#schemaAsUserInput")?.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          loadAsUser();
+        }
+      });
+    }
+
+    function loadAsUser() {
+      const key = String($("#schemaAsUserInput")?.value || "").trim().toLowerCase();
+      state.asUserKey = key;
+      const profile = DEMO_USERS[key];
+      const status = $("#schemaAsUserStatus");
+      if (!profile) {
+        if (status) status.textContent = "Demo users: rep@example.com or readonly@example.com";
+        return;
+      }
+      state.asUser = { Id: profile.Id, Name: profile.Name, Username: profile.Username };
+      state.overlays = {};
+      const pack = profile.byObject[state.center] || profile.byObject.Account;
+      state.overlays[state.center] = buildUserPermOverlay({
+        user: state.asUser,
+        objectApiName: state.center,
+        objectPerms: pack?.objectPerms || [],
+        fieldPerms: pack?.fieldPerms || []
+      });
+      render(state.center);
+    }
+
+    function clearAsUser() {
+      state.asUserKey = "";
+      state.asUser = null;
+      state.overlays = {};
+      render(state.center);
+    }
+
+    function buildCard(describe, isCenter) {
+      const kind = objectKind(describe.name, !!describe.custom);
+      const overlay = isCenter ? currentOverlay(describe.name) : null;
+      const access = overlay?.mode === "user" ? overlay.objectAccess : sessionObjectAccess(describe);
+      const fields = pickCardFields(describe, { max: isCenter ? 12 : 8 });
+      const card = document.createElement("div");
+      card.className = `sb-card ${objectKindClass(kind)}${isCenter ? " is-center" : ""}${
+        overlay?.mode === "user" ? " has-as-user" : ""
+      }`;
+      card.dataset.object = describe.name;
+      const crudTitle = overlay?.mode === "user" ? `CRUD for ${overlay.userLabel}` : "Session CRUD";
+      const crudHtml = isCenter
+        ? `<div class="sb-crud-strip" title="${escapeHtml(crudTitle)}">${crudStripHtml(access)}</div>`
+        : "";
+      card.innerHTML = `
+        <div class="sb-card-head" title="Focus ${escapeHtml(describe.name)}">
+          <div>
+            <span class="sb-kind">${escapeHtml(kind)}</span>
+            <strong>${escapeHtml(describe.label || describe.name)}</strong>
+            <span class="sb-api">${escapeHtml(describe.name)}</span>
+          </div>
+        </div>
+        ${crudHtml}
+        <div class="sb-fields">
+          ${fields
+            .map((f) => {
+              const badges = fieldSchemaBadges(f, overlay);
+              const rel = f.referenceTo?.length ? " is-rel" : "";
+              const req = !f.nillable && f.createable ? " is-required" : "";
+              const denied = !badges.readable ? " is-denied" : "";
+              const accessHtml = badges.access
+                .map((b) => `<span class="sb-badge sb-badge-${b.kind}" title="${escapeHtml(b.title)}">${escapeHtml(b.key)}</span>`)
+                .join("");
+              const flagHtml = badges.flags
+                .map((b) => `<span class="sb-badge sb-badge-${b.kind}" title="${escapeHtml(b.title)}">${escapeHtml(b.key)}</span>`)
+                .join("");
+              return `<div class="sb-field${rel}${req}${denied}" data-field="${escapeHtml(f.name)}" data-object="${escapeHtml(describe.name)}" title="${escapeHtml(badges.reason || f.name)}">
+                <span class="sb-field-name">${escapeHtml(f.label || f.name)}</span>
+                <span class="sb-field-meta">
+                  <span class="sb-field-badges">${accessHtml}${flagHtml}</span>
+                  <span class="sb-field-type">${escapeHtml(formatFieldType(f))}</span>
+                </span>
+              </div>`;
+            })
+            .join("")}
+        </div>
+        <div class="sb-more-static">${describe.fields.length} fields</div>
+      `;
+      card.querySelector(".sb-card-head").addEventListener("click", () => {
+        if (describe.name !== state.center) render(describe.name);
+      });
+      card.querySelectorAll(".sb-field[data-field]").forEach((row) => {
+        row.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const fieldName = row.getAttribute("data-field");
+          const field = (describe.fields || []).find((f) => f.name === fieldName);
+          if (!field) return;
+          openFieldMenu({
+            field,
+            objectName: describe.name,
+            anchorEl: row,
+            clientX: e.clientX,
+            clientY: e.clientY
+          });
+        });
+      });
+      return card;
     }
 
     function drawLines(edges) {
-      const svg = document.getElementById("schemaLines");
-      const host = document.getElementById("schemaCards");
-      let maxX = 900, maxY = 700;
+      const svg = $("#schemaLines");
+      const host = $("#schemaCards");
+      let maxX = 900;
+      let maxY = 700;
       for (const card of host.querySelectorAll(".sb-card")) {
         maxX = Math.max(maxX, card.offsetLeft + card.offsetWidth + 80);
         maxY = Math.max(maxY, card.offsetTop + card.offsetHeight + 80);
       }
-      svg.setAttribute("width", maxX);
-      svg.setAttribute("height", maxY);
-      svg.style.width = maxX + "px";
-      svg.style.height = maxY + "px";
+      svg.setAttribute("width", String(maxX));
+      svg.setAttribute("height", String(maxY));
+      svg.style.width = `${maxX}px`;
+      svg.style.height = `${maxY}px`;
       svg.innerHTML = `<defs>
         <marker id="sb-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b9bd5"></path>
         </marker>
+        <marker id="sb-arrow-md" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#e07a5f"></path>
+        </marker>
       </defs>`;
+
       for (const edge of edges) {
-        const fromField = host.querySelector(`.sb-field[data-object="${edge.fromObject}"][data-field="${edge.fromField}"]`);
-        const fromCard = host.querySelector(`.sb-card[data-object="${edge.fromObject}"]`);
-        const toCard = host.querySelector(`.sb-card[data-object="${edge.toObject}"]`);
+        const fromField = host.querySelector(
+          `.sb-field[data-object="${CSS.escape(edge.fromObject)}"][data-field="${CSS.escape(edge.fromField)}"]`
+        );
+        const fromCard = host.querySelector(`.sb-card[data-object="${CSS.escape(edge.fromObject)}"]`);
+        const toCard = host.querySelector(`.sb-card[data-object="${CSS.escape(edge.toObject)}"]`);
         const fromEl = fromField || fromCard;
         if (!fromEl || !toCard) continue;
         const x1 = fromEl.offsetLeft + (fromField ? fromEl.offsetWidth : fromEl.offsetWidth / 2);
@@ -193,33 +573,199 @@
         const dx = Math.max(40, Math.abs(x2 - x1) * 0.35);
         const c1x = x1 + (x2 >= x1 ? dx : -dx);
         const c2x = x2 + (x2 >= x1 ? -dx : dx);
+        const d = `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`;
+        const highlighted = state.highlightedEdgeId === edge.id;
+        const baseClass = edge.kind === "masterdetail" ? "sb-line sb-line-md" : "sb-line";
+
+        const hit = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        hit.setAttribute("d", d);
+        hit.setAttribute("class", "sb-line-hit");
+        hit.dataset.edgeId = edge.id;
+        hit.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          onEdgeClick(edge);
+        });
+        svg.appendChild(hit);
+
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`);
-        path.setAttribute("class", "sb-line");
-        path.setAttribute("marker-end", "url(#sb-arrow)");
+        path.setAttribute("d", d);
+        path.setAttribute("class", `${baseClass}${highlighted ? " is-highlight" : ""}`);
+        path.setAttribute("marker-end", `url(#sb-arrow${edge.kind === "masterdetail" ? "-md" : ""})`);
         svg.appendChild(path);
+
+        const tick = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        tick.setAttribute("cx", String(x1));
+        tick.setAttribute("cy", String(y1));
+        tick.setAttribute("r", "3.5");
+        tick.setAttribute("class", edge.kind === "masterdetail" ? "sb-line-dot sb-line-md" : "sb-line-dot");
+        svg.appendChild(tick);
       }
     }
 
-    const vp = document.getElementById("schemaViewport");
-    let dragging = false, lx = 0, ly = 0;
+    function onEdgeClick(edge) {
+      state.highlightedEdgeId = edge.id;
+      drawLines(state.edges);
+      const center = DESCRIBES[state.center];
+      if (!center) return;
+      if (edge.fromObject === center.name) {
+        const parent =
+          extractParentRelations(center).find((p) => p.fieldName === edge.fromField) || {
+            fieldName: edge.fromField,
+            relationshipName: null,
+            targetObject: edge.toObject,
+            type: edge.kind
+          };
+        previewSoql(buildParentPathQuery(center, parent));
+        return;
+      }
+      if (edge.toObject === center.name) {
+        const child =
+          extractChildRelations(center).find(
+            (c) => c.childObject === edge.fromObject && c.fieldName === edge.fromField
+          ) || {
+            childObject: edge.fromObject,
+            fieldName: edge.fromField,
+            relationshipName: null,
+            cascadeDelete: edge.kind === "masterdetail"
+          };
+        previewSoql(buildChildSubquery(center, child) || buildObjectQuery(center));
+      }
+    }
+
+    function render(name) {
+      if (!DESCRIBES[name]) return;
+      hideFieldMenu();
+      state.center = name;
+      state.highlightedEdgeId = "";
+      const describe = DESCRIBES[name];
+      const parents = extractParentRelations(describe);
+      const children = extractChildRelations(describe);
+      const parentNames = [...new Set(parents.map((p) => p.targetObject))].filter((n) => DESCRIBES[n]).slice(0, 6);
+      const childNames = [...new Set(children.map((c) => c.childObject))]
+        .filter((n) => DESCRIBES[n] && n !== name)
+        .slice(0, 8);
+      const positions = layoutSchemaGraph({
+        centerName: name,
+        parentNames,
+        childNames,
+        cardWidth: 268,
+        gapX: 40,
+        gapY: 80,
+        centerY: 300
+      });
+      let minX = Infinity;
+      let minY = Infinity;
+      for (const p of positions.values()) {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+      }
+      const ox = 40 - minX;
+      const oy = 40 - minY;
+      const host = $("#schemaCards");
+      host.replaceChildren();
+      for (const [obj, pos] of positions) {
+        const card = buildCard(DESCRIBES[obj], obj === name);
+        card.style.left = `${pos.x + ox}px`;
+        card.style.top = `${pos.y + oy}px`;
+        host.appendChild(card);
+      }
+      state.edges = buildGraphEdges({
+        centerName: name,
+        parents: parents.filter((p) => parentNames.includes(p.targetObject)),
+        children: children.filter((c) => childNames.includes(c.childObject))
+      });
+      drawLines(state.edges);
+
+      $("#schemaActions").innerHTML = `
+        <button type="button" class="btn primary" id="schemaQueryObject">Query this object</button>
+        <button type="button" class="btn" id="schemaParentPath">Query via Owner</button>
+        <button type="button" class="btn" id="schemaChildSub">Child subquery (Contacts)</button>
+        <span class="hint" style="margin:0">Focused: <strong>${escapeHtml(name)}</strong></span>
+      `;
+      $("#schemaQueryObject").onclick = () => previewSoql(buildObjectQuery(describe));
+      $("#schemaParentPath").onclick = () => {
+        const parent = parents.find((p) => p.fieldName === "OwnerId") || parents[0];
+        if (parent) previewSoql(buildParentPathQuery(describe, parent));
+      };
+      $("#schemaChildSub").onclick = () => {
+        const child = children.find((c) => c.relationshipName === "Contacts") || children[0];
+        if (child) previewSoql(buildChildSubquery(describe, child));
+      };
+
+      renderPermDrawer(describe);
+      applyDrawer();
+      previewSoql(buildObjectQuery(describe));
+      applyTransform();
+    }
+
+    function applyDrawer() {
+      const drawer = $("#schemaPermDrawer");
+      drawer.hidden = !state.drawerOpen;
+      $("#schemaTogglePerms")?.classList.toggle("active", state.drawerOpen);
+    }
+
+    $("#schemaTogglePerms").addEventListener("click", () => {
+      state.drawerOpen = !state.drawerOpen;
+      applyDrawer();
+    });
+    $("#schemaPermClose").addEventListener("click", () => {
+      state.drawerOpen = false;
+      applyDrawer();
+    });
+    $("#schemaZoomIn").onclick = () => {
+      state.view.scale = Math.min(1.6, state.view.scale * 1.15);
+      applyTransform();
+    };
+    $("#schemaZoomOut").onclick = () => {
+      state.view.scale = Math.max(0.5, state.view.scale / 1.15);
+      applyTransform();
+    };
+    $("#schemaZoomReset").onclick = () => {
+      state.view = { x: 36, y: 18, scale: 0.88 };
+      applyTransform();
+    };
+
+    const vp = $("#schemaViewport");
+    let dragging = false;
+    let lx = 0;
+    let ly = 0;
     vp.addEventListener("pointerdown", (e) => {
-      if (e.target.closest(".sb-card")) return;
-      dragging = true; lx = e.clientX; ly = e.clientY; vp.classList.add("is-panning");
+      if (e.target.closest(".sb-card") || e.target.closest(".sb-line-hit")) return;
+      dragging = true;
+      lx = e.clientX;
+      ly = e.clientY;
+      vp.classList.add("is-panning");
+      hideFieldMenu();
     });
     vp.addEventListener("pointermove", (e) => {
       if (!dragging) return;
-      view.x += e.clientX - lx; view.y += e.clientY - ly; lx = e.clientX; ly = e.clientY; applyTransform();
-    });
-    vp.addEventListener("pointerup", () => { dragging = false; vp.classList.remove("is-panning"); });
-    vp.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      view.scale = Math.min(1.6, Math.max(0.5, view.scale * (e.deltaY > 0 ? 1/1.08 : 1.08)));
+      state.view.x += e.clientX - lx;
+      state.view.y += e.clientY - ly;
+      lx = e.clientX;
+      ly = e.clientY;
       applyTransform();
-    }, { passive: false });
-    document.getElementById("schemaZoomIn").onclick = () => { view.scale = Math.min(1.6, view.scale * 1.15); applyTransform(); };
-    document.getElementById("schemaZoomOut").onclick = () => { view.scale = Math.max(0.5, view.scale / 1.15); applyTransform(); };
-    document.getElementById("schemaZoomReset").onclick = () => { view = { x: 40, y: 20, scale: 0.92 }; applyTransform(); };
+    });
+    vp.addEventListener("pointerup", () => {
+      dragging = false;
+      vp.classList.remove("is-panning");
+    });
+    vp.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        state.view.scale = Math.min(1.6, Math.max(0.5, state.view.scale * (e.deltaY > 0 ? 1 / 1.08 : 1.08)));
+        applyTransform();
+      },
+      { passive: false }
+    );
+
+    document.addEventListener("click", (e) => {
+      if (e.target.closest?.("#schemaFieldMenu") || e.target.closest?.(".sb-field[data-field]")) return;
+      hideFieldMenu();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") hideFieldMenu();
+    });
 
     render("Account");
   </script>
