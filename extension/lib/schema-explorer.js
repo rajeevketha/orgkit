@@ -329,3 +329,113 @@ export function buildGraphEdges({ centerName, parents = [], children = [] } = {}
   }
   return edges;
 }
+
+/**
+ * Session-user object access from REST describe flags (no extra API call).
+ */
+export function sessionObjectAccess(describe) {
+  if (!describe) {
+    return { create: false, read: false, edit: false, del: false, queryable: false, searchable: false };
+  }
+  return {
+    create: !!describe.createable,
+    read: !!(describe.queryable || describe.retrieveable),
+    edit: !!describe.updateable,
+    del: !!describe.deletable,
+    queryable: !!describe.queryable,
+    searchable: !!describe.searchable
+  };
+}
+
+/**
+ * Field access + schema flags for Schema Builder badges.
+ * Session FLS inferred from describe: fields returned are readable unless accessible===false.
+ */
+export function fieldSchemaBadges(field) {
+  if (!field?.name) return { access: [], flags: [], readable: false, editable: false, reason: "" };
+  const readable = field.accessible !== false;
+  const editable = !!field.updateable;
+  /** @type {Array<{ key: string, title: string, kind: string }>} */
+  const access = [];
+  if (readable) access.push({ key: "R", title: "Readable for this session", kind: "ok" });
+  else access.push({ key: "R", title: "Not readable for this session", kind: "no" });
+  if (editable) access.push({ key: "E", title: "Editable for this session", kind: "ok" });
+  else access.push({ key: "E", title: "Not editable for this session", kind: "no" });
+
+  /** @type {Array<{ key: string, title: string, kind: string }>} */
+  const flags = [];
+  if (!field.nillable && field.createable) {
+    flags.push({ key: "Req", title: "Required on create", kind: "req" });
+  }
+  if (field.unique) flags.push({ key: "Unq", title: "Unique", kind: "flag" });
+  if (field.externalId) flags.push({ key: "Ext", title: "External ID", kind: "flag" });
+  if (field.custom) flags.push({ key: "Cstm", title: "Custom field", kind: "flag" });
+  if (field.calculated || field.autoNumber) {
+    flags.push({ key: "Fx", title: "Formula / auto-number", kind: "flag" });
+  }
+  if (field.referenceTo?.length) {
+    flags.push({
+      key: field.type === "masterdetail" ? "MD" : "Lk",
+      title: formatFieldType(field),
+      kind: "rel"
+    });
+  }
+
+  let reason = "";
+  if (!editable) {
+    if (field.calculated) reason = "Formula/calculated fields are not directly editable";
+    else if (field.autoNumber) reason = "Auto-number fields are system-managed";
+    else if (field.type === "id") reason = "Id is system-managed";
+    else if (field.accessible === false) reason = "Field is not accessible (FLS)";
+    else if (!field.updateable) reason = "Describe reports updateable=false for this session";
+  }
+
+  return { access, flags, readable, editable, reason };
+}
+
+export function summarizeSessionPermissions(describe) {
+  const access = sessionObjectAccess(describe);
+  const fields = Array.isArray(describe?.fields) ? describe.fields : [];
+  let readable = 0;
+  let editable = 0;
+  let required = 0;
+  let custom = 0;
+  const blockedEdit = [];
+  for (const f of fields) {
+    const b = fieldSchemaBadges(f);
+    if (b.readable) readable += 1;
+    if (b.editable) editable += 1;
+    if (!f.nillable && f.createable) required += 1;
+    if (f.custom) custom += 1;
+    if (b.readable && !b.editable && blockedEdit.length < 8 && f.name !== "Id") {
+      blockedEdit.push({ name: f.name, reason: b.reason || "Not updateable" });
+    }
+  }
+  return {
+    access,
+    fieldCounts: {
+      total: fields.length,
+      readable,
+      editable,
+      required,
+      custom,
+      notReadable: fields.length - readable
+    },
+    blockedEdit
+  };
+}
+
+export function crudStripHtml(access) {
+  const cells = [
+    ["C", access.create, "Create"],
+    ["R", access.read, "Read / query"],
+    ["U", access.edit, "Update"],
+    ["D", access.del, "Delete"]
+  ];
+  return cells
+    .map(
+      ([k, ok, title]) =>
+        `<span class="sb-crud ${ok ? "is-on" : "is-off"}" title="${title}: ${ok ? "Yes" : "No"}">${k}</span>`
+    )
+    .join("");
+}

@@ -14,7 +14,11 @@ import {
   formatFieldType,
   pickCardFields,
   layoutSchemaGraph,
-  buildGraphEdges
+  buildGraphEdges,
+  sessionObjectAccess,
+  fieldSchemaBadges,
+  summarizeSessionPermissions,
+  crudStripHtml
 } from "./schema-explorer.js";
 
 test("objectKind classifies standard, custom, and metadata", () => {
@@ -188,4 +192,41 @@ test("buildGraphEdges links lookups both ways", () => {
   assert.equal(edges.length, 2);
   assert.equal(edges[0].fromObject, "Account");
   assert.equal(edges[1].toObject, "Account");
+});
+
+test("session CRUD and field badges from describe", () => {
+  const describe = {
+    name: "Account",
+    createable: true,
+    updateable: true,
+    deletable: false,
+    queryable: true,
+    fields: [
+      { name: "Id", type: "id", updateable: false },
+      { name: "Name", type: "string", nillable: false, createable: true, updateable: true },
+      { name: "Secret__c", type: "string", custom: true, accessible: false, updateable: false },
+      {
+        name: "OwnerId",
+        type: "reference",
+        referenceTo: ["User"],
+        updateable: true,
+        nillable: false,
+        createable: true
+      }
+    ]
+  };
+  const access = sessionObjectAccess(describe);
+  assert.equal(access.create, true);
+  assert.equal(access.del, false);
+  assert.equal(access.read, true);
+  const nameBadges = fieldSchemaBadges(describe.fields[1]);
+  assert.equal(nameBadges.readable, true);
+  assert.equal(nameBadges.editable, true);
+  assert.ok(nameBadges.flags.some((f) => f.key === "Req"));
+  const secret = fieldSchemaBadges(describe.fields[2]);
+  assert.equal(secret.readable, false);
+  const summary = summarizeSessionPermissions(describe);
+  assert.equal(summary.fieldCounts.readable, 3);
+  assert.equal(summary.fieldCounts.custom, 1);
+  assert.match(crudStripHtml(access), /is-on/);
 });

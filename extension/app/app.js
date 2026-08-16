@@ -35,9 +35,14 @@ import {
   buildChildSubquery,
   schemaSummary,
   scoreSchemaObject,
+  formatFieldType,
   pickCardFields,
   layoutSchemaGraph,
-  buildGraphEdges
+  buildGraphEdges,
+  sessionObjectAccess,
+  fieldSchemaBadges,
+  summarizeSessionPermissions,
+  crudStripHtml
 } from "../lib/schema-explorer.js";
 import { METADATA_SEARCH_TYPES, lightningBaseFromOrg } from "../lib/metadata-open.js";
 import { PACKAGE_TYPES, buildPackageXml, packageVersion } from "../lib/package-xml.js";
@@ -204,6 +209,7 @@ const state = {
   schemaNeighbors: {},
   schemaExpanded: {},
   schemaView: { x: 0, y: 0, scale: 1 },
+  schemaPermDrawerOpen: true,
   packageSelections: [],
   packageMembersCache: [],
   lastPackageXml: "",
@@ -2298,6 +2304,14 @@ function bindSchemaCanvasControls() {
   $("#schemaZoomReset")?.addEventListener("click", () => {
     fitSchemaView();
   });
+  $("#schemaTogglePerms")?.addEventListener("click", () => {
+    state.schemaPermDrawerOpen = !state.schemaPermDrawerOpen;
+    applySchemaPermDrawer();
+  });
+  $("#schemaPermClose")?.addEventListener("click", () => {
+    state.schemaPermDrawerOpen = false;
+    applySchemaPermDrawer();
+  });
 
   const viewport = $("#schemaViewport");
   if (!viewport || viewport.dataset.bound === "1") return;
@@ -2484,6 +2498,66 @@ function renderSchemaExplorer() {
   renderSchemaBreadcrumb();
   renderSchemaCanvas(describe);
   renderSchemaActions(describe);
+  renderSchemaPermDrawer(describe);
+  applySchemaPermDrawer();
+}
+
+function applySchemaPermDrawer() {
+  const drawer = $("#schemaPermDrawer");
+  const btn = $("#schemaTogglePerms");
+  if (!drawer) return;
+  const open = state.schemaPermDrawerOpen !== false && !!state.schemaDescribe;
+  drawer.hidden = !open;
+  btn?.classList.toggle("active", open);
+}
+
+function renderSchemaPermDrawer(describe) {
+  const body = $("#schemaPermBody");
+  if (!body || !describe) return;
+  const summary = summarizeSessionPermissions(describe);
+  const { access, fieldCounts, blockedEdit } = summary;
+  const blockedHtml = blockedEdit.length
+    ? `<ul class="schema-perm-list">${blockedEdit
+        .map(
+          (b) =>
+            `<li><code>${escapeHtml(b.name)}</code> — ${escapeHtml(b.reason || "Not editable")}</li>`
+        )
+        .join("")}</ul>`
+    : `<p class="hint">No notable non-editable fields in the first samples.</p>`;
+
+  body.innerHTML = `
+    <p class="hint" style="margin-top:0">Effective access for <strong>this browser session</strong> (from object describe). Not another user’s permissions.</p>
+    <div class="sb-crud-strip large">${crudStripHtml(access)}</div>
+    <div class="schema-perm-stats">
+      <div><span>${fieldCounts.total}</span> fields</div>
+      <div><span>${fieldCounts.readable}</span> readable</div>
+      <div><span>${fieldCounts.editable}</span> editable</div>
+      <div><span>${fieldCounts.required}</span> required</div>
+      <div><span>${fieldCounts.custom}</span> custom</div>
+    </div>
+    <div class="label">Why some fields aren’t editable</div>
+    ${blockedHtml}
+    <div class="row wrap" style="margin-top:10px;gap:6px">
+      <button type="button" class="btn" id="schemaOpenPerms">Open Permission Investigator</button>
+      <button type="button" class="btn ghost" id="schemaCopySelectList">Copy readable field list</button>
+    </div>
+  `;
+  $("#schemaOpenPerms")?.addEventListener("click", () => {
+    const input = $("#permObject");
+    if (input) input.value = describe.name;
+    showView("perms");
+  });
+  $("#schemaCopySelectList")?.addEventListener("click", async () => {
+    const names = (describe.fields || [])
+      .filter((f) => fieldSchemaBadges(f).readable)
+      .map((f) => f.name)
+      .slice(0, 100);
+    try {
+      await navigator.clipboard.writeText(names.join(", "));
+    } catch {
+      /* ignore */
+    }
+  });
 }
 
 function renderSchemaBreadcrumb() {
@@ -2571,9 +2645,13 @@ function buildSchemaCard(describe, isCenter) {
   const expanded = !!state.schemaExpanded?.[describe.name];
   const fields = pickCardFields(describe, { max: isCenter ? 12 : 8, expanded });
   const total = describe.fields?.length || 0;
+  const access = sessionObjectAccess(describe);
   const card = document.createElement("div");
   card.className = `sb-card ${objectKindClass(kind)}${isCenter ? " is-center" : ""}`;
   card.dataset.object = describe.name;
+  const crudHtml = isCenter
+    ? `<div class="sb-crud-strip" title="Session CRUD for this object">${crudStripHtml(access)}</div>`
+    : "";
   card.innerHTML = `
     <div class="sb-card-head" title="Focus ${escapeHtml(describe.name)}">
       <div>
@@ -2582,16 +2660,34 @@ function buildSchemaCard(describe, isCenter) {
         <span class="sb-api">${escapeHtml(describe.name)}</span>
       </div>
     </div>
+    ${crudHtml}
     <div class="sb-fields">
       ${
         fields.length
           ? fields
               .map((f) => {
+                const badges = fieldSchemaBadges(f);
                 const rel = f.referenceTo?.length ? " is-rel" : "";
                 const req = !f.nillable && f.createable ? " is-required" : "";
-                return `<div class="sb-field${rel}${req}" data-field="${escapeHtml(f.name)}" data-object="${escapeHtml(describe.name)}">
+                const denied = !badges.readable ? " is-denied" : "";
+                const accessHtml = badges.access
+                  .map(
+                    (b) =>
+                      `<span class="sb-badge sb-badge-${b.kind}" title="${escapeHtml(b.title)}">${escapeHtml(b.key)}</span>`
+                  )
+                  .join("");
+                const flagHtml = badges.flags
+                  .map(
+                    (b) =>
+                      `<span class="sb-badge sb-badge-${b.kind}" title="${escapeHtml(b.title)}">${escapeHtml(b.key)}</span>`
+                  )
+                  .join("");
+                return `<div class="sb-field${rel}${req}${denied}" data-field="${escapeHtml(f.name)}" data-object="${escapeHtml(describe.name)}" title="${escapeHtml(badges.reason || f.name)}">
                   <span class="sb-field-name">${escapeHtml(f.label || f.name)}</span>
-                  <span class="sb-field-type">${escapeHtml(formatFieldType(f))}</span>
+                  <span class="sb-field-meta">
+                    <span class="sb-field-badges">${accessHtml}${flagHtml}</span>
+                    <span class="sb-field-type">${escapeHtml(formatFieldType(f))}</span>
+                  </span>
                 </div>`;
               })
               .join("")
