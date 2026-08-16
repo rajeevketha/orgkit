@@ -34,8 +34,16 @@
   <section id="view-home" class="view active">
     <p class="lede">Session Workbench — opens on the Salesforce org you launched from; use Active session to switch when multiple orgs are open.</p>
 
+    <button type="button" class="nl-spotlight" data-open="nl-soql" id="nlSpotlight">
+      <span class="nl-spotlight-kicker">Signature feature</span>
+      <strong class="nl-spotlight-title">NL → SOQL</strong>
+      <span class="nl-spotlight-blurb">Describe what you need in plain English — OrgKit writes the SOQL (standard, custom, CMDT, or Tooling).</span>
+      <span class="nl-spotlight-cta">Try NL → SOQL</span>
+    </button>
+
     <div class="wb-launch" id="wbLaunch">
-      <button type="button" class="btn primary" data-open="soql-run">SOQL</button>
+      <button type="button" class="btn primary" data-open="nl-soql">NL → SOQL</button>
+      <button type="button" class="btn" data-open="soql-run">SOQL</button>
       <button type="button" class="btn" data-open="anon-apex">Anon Apex</button>
       <button type="button" class="btn" data-open="describe">Describe</button>
       <button type="button" class="btn" data-open="org-compare">Org Compare</button>
@@ -114,6 +122,15 @@
 
   <!-- FEATURE: NL SOQL -->
   <section id="view-nl-soql" class="view">
+    <p class="lede nl-view-lede">
+      OrgKit’s standout tool — type a request in plain English and get runnable SOQL for this org.
+    </p>
+    <div class="nl-examples" id="nlExamples" aria-label="Example prompts">
+      <button type="button" class="nl-chip" data-nl-example="Accounts created this week with their owner name">Accounts this week + owner</button>
+      <button type="button" class="nl-chip" data-nl-example="Open Cases for high priority with Account Name">High-priority Cases</button>
+      <button type="button" class="nl-chip" data-nl-example="Custom objects modified in the last 7 days">Recent custom objects</button>
+      <button type="button" class="nl-chip" data-nl-example="Apex classes that contain Batchable">Tooling: Batchable classes</button>
+    </div>
     <div class="row wrap" style="margin-bottom:8px">
       <label class="label tight" for="nlApiMode">API</label>
       <select id="nlApiMode" class="select" title="Standard objects / custom metadata, or Tooling API">
@@ -122,7 +139,7 @@
       </select>
     </div>
     <label class="label" for="nlInput">Describe the data you need</label>
-    <textarea id="nlInput" class="textarea" rows="3" placeholder="Show recent records for an object"></textarea>
+    <textarea id="nlInput" class="textarea" rows="3" placeholder="e.g. Contacts at Accounts in California, limit 50"></textarea>
     <p class="hint">
       Works with standard objects, custom objects (__c), and custom metadata (__mdt). Tooling mode matches ApexClass, FlowDefinition, Flow versions, and other Tooling entities. Results respect your Salesforce permissions.
     </p>

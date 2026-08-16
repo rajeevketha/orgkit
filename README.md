@@ -1,15 +1,19 @@
 # OrgKit
 
-Chrome extension for Salesforce developers — Session Workbench, dual-org **Org Compare**, SOQL/Apex/schema tools, and Setup utilities.
+Chrome extension for Salesforce developers — **NL → SOQL**, Session Workbench, dual-org **Org Compare**, SOQL/Apex/schema tools, and Setup utilities.
 
 ## Version
 
-**1.8.8**
+**1.8.9**
 
 ## Features
 
+### NL → SOQL (signature)
+- Plain English → runnable SOQL for standard, custom, CMDT, and Tooling
+- Featured on the Session Workbench home with example prompts
+
 ### Session Workbench (home)
-- Quick launch: SOQL · Anon Apex · Describe · **Org Compare** · Metadata · Debug logs · Record/ID
+- Quick launch: **NL → SOQL** · SOQL · Anon Apex · Describe · **Org Compare** · Metadata · Debug logs · Record/ID
 - Continue / pinned SOQL / per-org scratch pad (local storage, no `sid`)
 
 ### Org Compare
@@ -19,7 +23,7 @@ Chrome extension for Salesforce developers — Session Workbench, dual-org **Org
 - Remembers last A/B pair by org key only (never `sid`)
 
 ### Also included
-Describe Browser, Metadata Quick Open, Package.xml Builder, Inactive Flow Cleaner, NL→SOQL, Flow/Governor/Error/Log tools, Formula builder, Permission investigator, Apex review, Setup links, ID tools, favorites.
+Describe Browser, Metadata Quick Open, Package.xml Builder, Inactive Flow Cleaner, Flow/Governor/Error/Log tools, Formula builder, Permission investigator, Apex review, Setup links, ID tools, favorites.
 
 ## Install (unpacked)
 
@@ -31,7 +35,7 @@ Describe Browser, Metadata Quick Open, Package.xml Builder, Inactive Flow Cleane
 ## Chrome Web Store
 
 - **Default upload zip:** [`extension/releases/OrgKit-store.zip`](extension/releases/OrgKit-store.zip)
-- Versioned: [`extension/releases/OrgKit-1.8.8-store.zip`](extension/releases/OrgKit-1.8.8-store.zip)
+- Versioned: [`extension/releases/OrgKit-1.8.9-store.zip`](extension/releases/OrgKit-1.8.9-store.zip)
 - Rebuild: `bash extension/scripts/pack-release.sh`
 - Listing URLs: [`extension/store/submission/STORE_LISTING_URLS.txt`](extension/store/submission/STORE_LISTING_URLS.txt)
 - Permission paste text: [`extension/store/submission/PERMISSION_JUSTIFICATIONS.txt`](extension/store/submission/PERMISSION_JUSTIFICATIONS.txt)

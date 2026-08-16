@@ -1,6 +1,6 @@
 ================================================================================
 Chrome Web Store — OrgKit listing copy (paste into Developer Dashboard)
-Version covered: 1.8.5
+Version covered: 1.8.9
 ================================================================================
 
 LANGUAGE
@@ -14,9 +14,9 @@ CATEGORY
 SHORT DESCRIPTION  (max 132 characters — count carefully)
 ================================================================================
 
-Salesforce toolkit: Session Workbench, Org Compare, SOQL, schema, Apex. Uses your open org tab session only.
+NL→SOQL plus Session Workbench, Org Compare, schema & Apex tools. Uses your open Salesforce tab session only.
 
-Character count: 113
+Character count: 118
 
 ================================================================================
 DETAILED DESCRIPTION
@@ -24,15 +24,17 @@ DETAILED DESCRIPTION
 
 OrgKit is a productivity toolkit for Salesforce developers and admins.
 
-What it does
-• Session Workbench home — quick launch, continue recent work, pinned SOQL, per-org scratch pad
+Signature feature — NL → SOQL
+Type what you need in plain English and OrgKit generates runnable SOQL for your open org — standard objects, custom objects (__c), custom metadata (__mdt), and Tooling entities. Generate, run, and export results without leaving the browser.
+
+What else it does
+• Session Workbench home — quick launch (NL→SOQL first), continue recent work, pinned SOQL, per-org scratch pad
 • Org Compare — dual-org drift check for objects/fields, profiles, permission sets, flows, Apex, validation rules, and related metadata
 • SOQL / Tooling runner with field autocomplete and a saved query library
 • Open query results in Lightning; show all data to view fields; update/delete with confirmation
 • Describe browser for standard and custom objects (fields + dependent picklists)
 • Metadata quick open, package.xml builder
 • Inactive flow version cleaner (Active versions are never deleted)
-• NL→SOQL for standard objects, custom objects, custom metadata, and Tooling entities
 • Apex review, governor heuristics, error/log helpers, permission investigator
 
 How authentication works
@@ -49,14 +51,15 @@ Privacy & permissions
 Permissions (summary)
 • cookies — Salesforce sid on Salesforce domains only
 • storage — settings, favorites, saved SOQL, workbench history/scratch, last Org Compare A/B org keys (never stores sid)
+• tabs — list open Salesforce tabs across windows for Active session / Org Compare
 • Host permissions — Salesforce domains only; OpenAI hosts are optional
-• Does not request activeTab or scripting (uses tabs only to list Salesforce sessions)
+• Does not request activeTab or scripting
 
 ================================================================================
 SINGLE PURPOSE
 ================================================================================
 
-OrgKit helps Salesforce developers work in their open org: run SOQL/Tooling queries, inspect schema/metadata (including custom objects), compare drift between two logged-in orgs, review Apex/flows, and open records — using the browser Salesforce session already available in a logged-in tab.
+OrgKit helps Salesforce developers work in their open org: turn plain English into SOQL (NL→SOQL), run SOQL/Tooling queries, inspect schema/metadata (including custom objects), compare drift between two logged-in orgs, review Apex/flows, and open records — using the browser Salesforce session already available in a logged-in tab.
 
 ================================================================================
 PUBLIC URLS (Chrome Web Store — OrgKit)
@@ -76,5 +79,4 @@ Privacy policy URL
 
 Notes
   - Product name is OrgKit.
-  - First rename the GitHub repo to orgkit and enable Pages (see STORE_LISTING_URLS.txt).
   - Confirm privacy URL opens in Incognito before submit.

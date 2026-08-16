@@ -87,6 +87,12 @@ import {
 } from "../lib/org-compare.js";
 
 const FEATURES = [
+  {
+    id: "nl-soql",
+    title: "NL → SOQL",
+    blurb: "Plain English → runnable SOQL / Tooling",
+    featured: true
+  },
   { id: "soql-run", title: "SOQL Runner", blurb: "Query standard & custom objects" },
   { id: "anon-apex", title: "Anonymous Apex", blurb: "Run Apex and view debug output" },
   { id: "describe", title: "Describe Browser", blurb: "Fields & dependencies for any object" },
@@ -98,7 +104,6 @@ const FEATURES = [
   { id: "meta-open", title: "Metadata Quick Open", blurb: "Open classes, flows, LWCs, and more" },
   { id: "package", title: "Package.xml Builder", blurb: "Build package.xml from selected members" },
   { id: "flow-clean", title: "Inactive Flow Cleaner", blurb: "Remove inactive versions safely" },
-  { id: "nl-soql", title: "NL → SOQL", blurb: "Plain English to SOQL / Tooling" },
   { id: "flow", title: "Flow Analyzer", blurb: "Find DML-in-loop and fault gaps" },
   { id: "governor", title: "Governor Predictor", blurb: "Estimate Apex limit risk" },
   { id: "errors", title: "Error Decoder", blurb: "Explain Salesforce errors" },
@@ -220,6 +225,7 @@ async function init() {
   });
   renderFeatureGrid();
   bindNav();
+  bindNlExamples();
   bindWorkbench();
   bindFeatureActions();
   bindUtilityActions();
@@ -279,10 +285,32 @@ function renderFeatureGrid() {
   FEATURES.forEach((f) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "feature-card";
-    btn.innerHTML = `<strong>${f.title}</strong><span>${f.blurb}</span>`;
+    btn.className = f.featured ? "feature-card feature-card-featured" : "feature-card";
+    btn.innerHTML = f.featured
+      ? `<span class="feature-card-badge">Signature</span><strong>${f.title}</strong><span>${f.blurb}</span>`
+      : `<strong>${f.title}</strong><span>${f.blurb}</span>`;
     btn.addEventListener("click", () => showView(f.id));
     grid.appendChild(btn);
+  });
+}
+
+function bindNlExamples() {
+  document.querySelectorAll("[data-nl-example]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const text = btn.getAttribute("data-nl-example") || "";
+      const input = $("#nlInput");
+      if (!input || !text) return;
+      input.value = text;
+      // Tooling example → switch API mode for convenience.
+      if (/tooling|apex class|flowdefinition|batchable/i.test(text)) {
+        const mode = $("#nlApiMode");
+        if (mode) mode.value = "tooling";
+      } else {
+        const mode = $("#nlApiMode");
+        if (mode) mode.value = "rest";
+      }
+      input.focus();
+    });
   });
 }
 

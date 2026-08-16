@@ -1,7 +1,7 @@
 {
-  "version": "1.8.8",
+  "version": "1.8.9",
   "storeZip": "OrgKit-store.zip",
-  "storeZipVersioned": "OrgKit-1.8.8-store.zip",
-  "testingZip": "OrgKit-1.8.8-for-testing.zip",
+  "storeZipVersioned": "OrgKit-1.8.9-store.zip",
+  "testingZip": "OrgKit-1.8.9-for-testing.zip",
   "currentZip": "OrgKit-CURRENT.zip"
 }
