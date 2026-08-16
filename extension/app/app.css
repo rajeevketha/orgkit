@@ -1187,9 +1187,23 @@ button.linkish:hover,
   stroke: #5b9bd5;
   stroke-width: 2;
   opacity: 0.9;
+  pointer-events: none;
 }
 .sb-line-md { stroke: #e07a5f; }
-.sb-line-dot { fill: #5b9bd5; }
+.sb-line.is-highlight {
+  stroke-width: 3.25;
+  opacity: 1;
+  stroke: #7ec8ff;
+}
+.sb-line-md.is-highlight { stroke: #ff9b7a; }
+.sb-line-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.sb-line-dot { fill: #5b9bd5; pointer-events: none; }
 .sb-line-dot.sb-line-md { fill: #e07a5f; }
 
 .sb-card {
@@ -1254,6 +1268,11 @@ button.linkish:hover,
   padding: 5px 10px;
   border-bottom: 1px solid rgba(42, 74, 107, 0.45);
   font-size: 11.5px;
+  cursor: pointer;
+}
+.sb-field:hover { background: rgba(1, 118, 211, 0.12); }
+.sb-card.has-as-user .sb-crud-strip {
+  outline: 1px solid rgba(126, 200, 255, 0.35);
 }
 .sb-field:last-child { border-bottom: 0; }
 .sb-field.is-required .sb-field-name::before {
@@ -1356,6 +1375,35 @@ html.shell-wide .schema-viewport { height: min(68vh, 640px); }
   border-color: rgba(1, 118, 211, 0.65);
   background: var(--accent-soft);
   color: var(--text);
+}
+.schema-field-menu {
+  position: fixed;
+  z-index: 80;
+  min-width: 200px;
+  max-width: min(280px, 90vw);
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #132639;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+.schema-field-menu.hidden,
+.schema-field-menu[hidden] { display: none !important; }
+.schema-field-menu-item {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.schema-field-menu-item:hover {
+  background: rgba(1, 118, 211, 0.2);
 }
 
 .sb-crud-strip {

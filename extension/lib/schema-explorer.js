@@ -351,16 +351,55 @@ export function sessionObjectAccess(describe) {
  * Field access + schema flags for Schema Builder badges.
  * Session FLS inferred from describe: fields returned are readable unless accessible===false.
  */
-export function fieldSchemaBadges(field) {
+export function fieldSchemaBadges(field, overlay = null) {
   if (!field?.name) return { access: [], flags: [], readable: false, editable: false, reason: "" };
-  const readable = field.accessible !== false;
-  const editable = !!field.updateable;
+
+  let readable = field.accessible !== false;
+  let editable = !!field.updateable;
+  let reason = "";
+  const label = overlay?.userLabel ? `user ${overlay.userLabel}` : "this session";
+
+  if (overlay?.mode === "user") {
+    const fp = overlay.fieldMap?.[field.name];
+    const objRead = !!overlay.objectAccess?.read;
+    const objEdit = !!overlay.objectAccess?.edit;
+    if (fp) {
+      readable = !!fp.read;
+      editable = !!fp.edit && objEdit;
+    } else if (field.custom) {
+      // Custom fields without a FieldPermissions row are typically not granted.
+      readable = false;
+      editable = false;
+      reason = `No FieldPermissions row for ${label}`;
+    } else {
+      // Standard fields: fall back to object CRUD when no explicit FLS row.
+      readable = objRead;
+      editable = objEdit && !!field.updateable;
+      if (!readable) reason = `No object Read for ${label}`;
+      else if (!editable) reason = field.updateable === false ? "Field is not updateable" : `No object Edit for ${label}`;
+    }
+  } else {
+    if (!editable) {
+      if (field.calculated) reason = "Formula/calculated fields are not directly editable";
+      else if (field.autoNumber) reason = "Auto-number fields are system-managed";
+      else if (field.type === "id") reason = "Id is system-managed";
+      else if (field.accessible === false) reason = "Field is not accessible (FLS)";
+      else if (!field.updateable) reason = "Describe reports updateable=false for this session";
+    }
+  }
+
   /** @type {Array<{ key: string, title: string, kind: string }>} */
   const access = [];
-  if (readable) access.push({ key: "R", title: "Readable for this session", kind: "ok" });
-  else access.push({ key: "R", title: "Not readable for this session", kind: "no" });
-  if (editable) access.push({ key: "E", title: "Editable for this session", kind: "ok" });
-  else access.push({ key: "E", title: "Not editable for this session", kind: "no" });
+  access.push({
+    key: "R",
+    title: readable ? `Readable for ${label}` : `Not readable for ${label}`,
+    kind: readable ? "ok" : "no"
+  });
+  access.push({
+    key: "E",
+    title: editable ? `Editable for ${label}` : `Not editable for ${label}`,
+    kind: editable ? "ok" : "no"
+  });
 
   /** @type {Array<{ key: string, title: string, kind: string }>} */
   const flags = [];
@@ -381,20 +420,54 @@ export function fieldSchemaBadges(field) {
     });
   }
 
-  let reason = "";
-  if (!editable) {
-    if (field.calculated) reason = "Formula/calculated fields are not directly editable";
-    else if (field.autoNumber) reason = "Auto-number fields are system-managed";
-    else if (field.type === "id") reason = "Id is system-managed";
-    else if (field.accessible === false) reason = "Field is not accessible (FLS)";
-    else if (!field.updateable) reason = "Describe reports updateable=false for this session";
-  }
-
   return { access, flags, readable, editable, reason };
 }
 
-export function summarizeSessionPermissions(describe) {
-  const access = sessionObjectAccess(describe);
+/** Build overlay maps from ObjectPermissions + FieldPermissions query rows. */
+export function buildUserPermOverlay({ user, objectApiName, objectPerms = [], fieldPerms = [] } = {}) {
+  const access = {
+    create: false,
+    read: false,
+    edit: false,
+    del: false,
+    viewAll: false,
+    modifyAll: false,
+    queryable: false,
+    searchable: false
+  };
+  for (const p of objectPerms || []) {
+    access.create ||= !!p.PermissionsCreate;
+    access.read ||= !!p.PermissionsRead;
+    access.edit ||= !!p.PermissionsEdit;
+    access.del ||= !!p.PermissionsDelete;
+    access.viewAll ||= !!p.PermissionsViewAllRecords;
+    access.modifyAll ||= !!p.PermissionsModifyAllRecords;
+  }
+  access.queryable = access.read;
+  /** @type {Record<string, { read: boolean, edit: boolean }>} */
+  const fieldMap = {};
+  for (const fp of fieldPerms || []) {
+    const raw = String(fp.Field || "");
+    const name = raw.includes(".") ? raw.split(".").pop() : raw;
+    if (!name) continue;
+    fieldMap[name] = {
+      read: !!fp.PermissionsRead,
+      edit: !!fp.PermissionsEdit
+    };
+  }
+  const userLabel = user?.Username || user?.Name || user?.Id || "user";
+  return {
+    mode: "user",
+    userLabel,
+    objectApiName: objectApiName || "",
+    objectAccess: access,
+    fieldMap,
+    user: user || null
+  };
+}
+
+export function summarizeSessionPermissions(describe, overlay = null) {
+  const access = overlay?.mode === "user" ? overlay.objectAccess : sessionObjectAccess(describe);
   const fields = Array.isArray(describe?.fields) ? describe.fields : [];
   let readable = 0;
   let editable = 0;
@@ -402,7 +475,7 @@ export function summarizeSessionPermissions(describe) {
   let custom = 0;
   const blockedEdit = [];
   for (const f of fields) {
-    const b = fieldSchemaBadges(f);
+    const b = fieldSchemaBadges(f, overlay);
     if (b.readable) readable += 1;
     if (b.editable) editable += 1;
     if (!f.nillable && f.createable) required += 1;
@@ -421,7 +494,8 @@ export function summarizeSessionPermissions(describe) {
       custom,
       notReadable: fields.length - readable
     },
-    blockedEdit
+    blockedEdit,
+    overlay
   };
 }
 

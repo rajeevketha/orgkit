@@ -42,7 +42,8 @@ import {
   sessionObjectAccess,
   fieldSchemaBadges,
   summarizeSessionPermissions,
-  crudStripHtml
+  crudStripHtml,
+  buildUserPermOverlay
 } from "../lib/schema-explorer.js";
 import { METADATA_SEARCH_TYPES, lightningBaseFromOrg } from "../lib/metadata-open.js";
 import { PACKAGE_TYPES, buildPackageXml, packageVersion } from "../lib/package-xml.js";
@@ -116,7 +117,7 @@ const FEATURES = [
   {
     id: "schema",
     title: "Schema Explorer",
-    blurb: "Schema Builder canvas — cards, fields & relationship lines"
+    blurb: "Schema Builder — cards, lines, session & as-user permissions"
   },
   { id: "soql-run", title: "SOQL Runner", blurb: "Query standard & custom objects" },
   { id: "anon-apex", title: "Anonymous Apex", blurb: "Run Apex and view debug output" },
@@ -210,6 +211,11 @@ const state = {
   schemaExpanded: {},
   schemaView: { x: 0, y: 0, scale: 1 },
   schemaPermDrawerOpen: true,
+  schemaAsUserKey: "",
+  schemaAsUser: null,
+  schemaAsUserOverlays: {},
+  schemaHighlightedEdgeId: "",
+  schemaFieldMenu: null,
   packageSelections: [],
   packageMembersCache: [],
   lastPackageXml: "",
@@ -1245,6 +1251,12 @@ async function switchActiveSession(orgKey) {
     state.schemaNeighbors = {};
     state.schemaExpanded = {};
     state.schemaView = { x: 0, y: 0, scale: 1 };
+    state.schemaAsUserKey = "";
+    state.schemaAsUser = null;
+    state.schemaAsUserOverlays = {};
+    state.schemaHighlightedEdgeId = "";
+    state.schemaFieldMenu = null;
+    hideSchemaFieldMenu();
     state.globalObjects = null;
     state.lastQueryTables = { soql: null, nl: null };
     state.lastQueryRecords = { soql: null, nl: null };
@@ -2313,6 +2325,17 @@ function bindSchemaCanvasControls() {
     applySchemaPermDrawer();
   });
 
+  if (!document.documentElement.dataset.schemaFieldMenuBound) {
+    document.documentElement.dataset.schemaFieldMenuBound = "1";
+    document.addEventListener("click", (e) => {
+      if (e.target.closest?.("#schemaFieldMenu") || e.target.closest?.(".sb-field[data-field]")) return;
+      hideSchemaFieldMenu();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") hideSchemaFieldMenu();
+    });
+  }
+
   const viewport = $("#schemaViewport");
   if (!viewport || viewport.dataset.bound === "1") return;
   viewport.dataset.bound = "1";
@@ -2440,6 +2463,8 @@ async function onLoadSchema({ resetTrail = true, sobject: forced } = {}) {
   $("#schemaSummary").textContent = "Loading schema canvas…";
   $("#schemaBuilder")?.classList.add("hidden");
   $("#schemaSoqlPreview")?.classList.add("hidden");
+  hideSchemaFieldMenu();
+  state.schemaHighlightedEdgeId = "";
   try {
     const res = await send("describeSObject", {
       tabUrl: await requireTabUrl(),
@@ -2480,6 +2505,12 @@ async function onLoadSchema({ resetTrail = true, sobject: forced } = {}) {
       drawSchemaLines();
       fitSchemaView();
     });
+    if (state.schemaAsUser?.Id) {
+      ensureSchemaAsUserOverlay(describe.name).then(() => {
+        renderSchemaExplorer();
+        requestAnimationFrame(() => drawSchemaLines());
+      }).catch(() => {});
+    }
     await trackActivity({
       type: "describe",
       title: `Schema: ${describe.name}`,
@@ -2490,6 +2521,82 @@ async function onLoadSchema({ resetTrail = true, sobject: forced } = {}) {
   } catch (e) {
     $("#schemaSummary").textContent = e.message || String(e);
   }
+}
+
+function currentSchemaOverlay(objectApiName) {
+  if (!state.schemaAsUser?.Id) return null;
+  const key = objectApiName || state.schemaDescribe?.name;
+  if (!key) return null;
+  return state.schemaAsUserOverlays?.[key] || null;
+}
+
+async function ensureSchemaAsUserOverlay(objectApiName) {
+  const user = state.schemaAsUser;
+  const sobject = objectApiName || state.schemaDescribe?.name;
+  if (!user?.Id || !sobject) return null;
+  if (state.schemaAsUserOverlays?.[sobject]) return state.schemaAsUserOverlays[sobject];
+  const tabUrl = await requireTabUrl();
+  const qs = buildPermissionQueries(user.Id, sobject);
+  const fill = (q) => q.replaceAll("{USER_ID}", user.Id);
+  const [objRes, fieldRes] = await Promise.all([
+    send("runSoql", { tabUrl, query: fill(qs.objectPerms), apiVersion: apiVersion() }),
+    send("runSoql", { tabUrl, query: fill(qs.fieldPerms), apiVersion: apiVersion() })
+  ]);
+  if (!objRes.ok) throw new Error(objRes.error || "ObjectPermissions query failed");
+  if (!fieldRes.ok) throw new Error(fieldRes.error || "FieldPermissions query failed");
+  const overlay = buildUserPermOverlay({
+    user,
+    objectApiName: sobject,
+    objectPerms: objRes.result?.records || [],
+    fieldPerms: fieldRes.result?.records || []
+  });
+  state.schemaAsUserOverlays = { ...(state.schemaAsUserOverlays || {}), [sobject]: overlay };
+  return overlay;
+}
+
+async function onLoadSchemaAsUser() {
+  const input = $("#schemaAsUserInput");
+  const status = $("#schemaAsUserStatus");
+  const userKey = String(input?.value || state.schemaAsUserKey || "").trim();
+  const objectApiName = state.schemaDescribe?.name;
+  if (!userKey) {
+    if (status) status.textContent = "Enter a username or user Id.";
+    return;
+  }
+  if (!objectApiName) {
+    if (status) status.textContent = "Load an object on the canvas first.";
+    return;
+  }
+  state.schemaAsUserKey = userKey;
+  if (status) status.textContent = "Loading permissions…";
+  try {
+    const tabUrl = await requireTabUrl();
+    const qs = buildPermissionQueries(userKey, objectApiName);
+    const userRes = await send("runSoql", { tabUrl, query: qs.user, apiVersion: apiVersion() });
+    if (!userRes.ok) throw new Error(userRes.error);
+    const user = userRes.result?.records?.[0];
+    if (!user) throw new Error("User not found");
+    state.schemaAsUser = user;
+    state.schemaAsUserOverlays = {};
+    await ensureSchemaAsUserOverlay(objectApiName);
+    if (status) {
+      status.textContent = `Showing permissions for ${user.Username || user.Name || user.Id}`;
+    }
+    renderSchemaExplorer();
+    requestAnimationFrame(() => drawSchemaLines());
+  } catch (e) {
+    if (status) status.textContent = e.message || String(e);
+  }
+}
+
+function onClearSchemaAsUser() {
+  state.schemaAsUserKey = "";
+  state.schemaAsUser = null;
+  state.schemaAsUserOverlays = {};
+  const input = $("#schemaAsUserInput");
+  if (input) input.value = "";
+  renderSchemaExplorer();
+  requestAnimationFrame(() => drawSchemaLines());
 }
 
 function renderSchemaExplorer() {
@@ -2514,8 +2621,13 @@ function applySchemaPermDrawer() {
 function renderSchemaPermDrawer(describe) {
   const body = $("#schemaPermBody");
   if (!body || !describe) return;
-  const summary = summarizeSessionPermissions(describe);
+  const overlay = currentSchemaOverlay(describe.name);
+  const summary = summarizeSessionPermissions(describe, overlay);
   const { access, fieldCounts, blockedEdit } = summary;
+  const asUser = state.schemaAsUser;
+  const modeLabel = overlay?.mode === "user"
+    ? `user <strong>${escapeHtml(overlay.userLabel)}</strong>`
+    : "<strong>this browser session</strong>";
   const blockedHtml = blockedEdit.length
     ? `<ul class="schema-perm-list">${blockedEdit
         .map(
@@ -2526,7 +2638,24 @@ function renderSchemaPermDrawer(describe) {
     : `<p class="hint">No notable non-editable fields in the first samples.</p>`;
 
   body.innerHTML = `
-    <p class="hint" style="margin-top:0">Effective access for <strong>this browser session</strong> (from object describe). Not another user’s permissions.</p>
+    <div class="label" style="margin-top:0">As user (overlay)</div>
+    <div class="row wrap" style="gap:6px;margin:6px 0">
+      <input type="text" class="input grow" id="schemaAsUserInput" placeholder="Username or Id" value="${escapeHtml(state.schemaAsUserKey || "")}" autocomplete="off" />
+    </div>
+    <div class="row wrap" style="gap:6px">
+      <button type="button" class="btn primary" id="schemaAsUserLoad">Load as user</button>
+      <button type="button" class="btn ghost" id="schemaAsUserClear" ${asUser ? "" : "disabled"}>Clear</button>
+    </div>
+    <p class="hint" id="schemaAsUserStatus">${
+      asUser
+        ? `Showing permissions for ${escapeHtml(asUser.Username || asUser.Name || asUser.Id)}`
+        : "Optional — overlays CRUD/FLS from ObjectPermissions + FieldPermissions."
+    }</p>
+    <p class="hint">Effective access for ${modeLabel}${
+      overlay?.mode === "user"
+        ? " (Permission Set / profile-set Object & Field permissions; standard fields fall back to object CRUD)."
+        : " (from object describe)."
+    }</p>
     <div class="sb-crud-strip large">${crudStripHtml(access)}</div>
     <div class="schema-perm-stats">
       <div><span>${fieldCounts.total}</span> fields</div>
@@ -2534,6 +2663,7 @@ function renderSchemaPermDrawer(describe) {
       <div><span>${fieldCounts.editable}</span> editable</div>
       <div><span>${fieldCounts.required}</span> required</div>
       <div><span>${fieldCounts.custom}</span> custom</div>
+      ${fieldCounts.notReadable ? `<div><span>${fieldCounts.notReadable}</span> not readable</div>` : ""}
     </div>
     <div class="label">Why some fields aren’t editable</div>
     ${blockedHtml}
@@ -2542,14 +2672,26 @@ function renderSchemaPermDrawer(describe) {
       <button type="button" class="btn ghost" id="schemaCopySelectList">Copy readable field list</button>
     </div>
   `;
+  $("#schemaAsUserLoad")?.addEventListener("click", () => {
+    onLoadSchemaAsUser().catch(() => {});
+  });
+  $("#schemaAsUserInput")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onLoadSchemaAsUser().catch(() => {});
+    }
+  });
+  $("#schemaAsUserClear")?.addEventListener("click", onClearSchemaAsUser);
   $("#schemaOpenPerms")?.addEventListener("click", () => {
     const input = $("#permObject");
+    const userInput = $("#permUser");
     if (input) input.value = describe.name;
+    if (userInput && state.schemaAsUserKey) userInput.value = state.schemaAsUserKey;
     showView("perms");
   });
   $("#schemaCopySelectList")?.addEventListener("click", async () => {
     const names = (describe.fields || [])
-      .filter((f) => fieldSchemaBadges(f).readable)
+      .filter((f) => fieldSchemaBadges(f, overlay).readable)
       .map((f) => f.name)
       .slice(0, 100);
     try {
@@ -2645,12 +2787,19 @@ function buildSchemaCard(describe, isCenter) {
   const expanded = !!state.schemaExpanded?.[describe.name];
   const fields = pickCardFields(describe, { max: isCenter ? 12 : 8, expanded });
   const total = describe.fields?.length || 0;
-  const access = sessionObjectAccess(describe);
+  const overlay = isCenter ? currentSchemaOverlay(describe.name) : null;
+  const access = overlay?.mode === "user" ? overlay.objectAccess : sessionObjectAccess(describe);
   const card = document.createElement("div");
-  card.className = `sb-card ${objectKindClass(kind)}${isCenter ? " is-center" : ""}`;
+  card.className = `sb-card ${objectKindClass(kind)}${isCenter ? " is-center" : ""}${
+    overlay?.mode === "user" ? " has-as-user" : ""
+  }`;
   card.dataset.object = describe.name;
+  const crudTitle =
+    overlay?.mode === "user"
+      ? `CRUD for ${overlay.userLabel}`
+      : "Session CRUD for this object";
   const crudHtml = isCenter
-    ? `<div class="sb-crud-strip" title="Session CRUD for this object">${crudStripHtml(access)}</div>`
+    ? `<div class="sb-crud-strip" title="${escapeHtml(crudTitle)}">${crudStripHtml(access)}</div>`
     : "";
   card.innerHTML = `
     <div class="sb-card-head" title="Focus ${escapeHtml(describe.name)}">
@@ -2666,7 +2815,7 @@ function buildSchemaCard(describe, isCenter) {
         fields.length
           ? fields
               .map((f) => {
-                const badges = fieldSchemaBadges(f);
+                const badges = fieldSchemaBadges(f, overlay);
                 const rel = f.referenceTo?.length ? " is-rel" : "";
                 const req = !f.nillable && f.createable ? " is-required" : "";
                 const denied = !badges.readable ? " is-denied" : "";
@@ -2716,7 +2865,130 @@ function buildSchemaCard(describe, isCenter) {
     renderSchemaExplorer();
     requestAnimationFrame(() => drawSchemaLines());
   });
+  card.querySelectorAll(".sb-field[data-field]").forEach((row) => {
+    row.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const fieldName = row.getAttribute("data-field");
+      const objectName = row.getAttribute("data-object") || describe.name;
+      const field = (describe.fields || []).find((f) => f.name === fieldName);
+      if (!field) return;
+      openSchemaFieldMenu({
+        field,
+        objectName,
+        anchorEl: row,
+        clientX: e.clientX,
+        clientY: e.clientY
+      });
+    });
+  });
   return card;
+}
+
+function hideSchemaFieldMenu() {
+  const menu = $("#schemaFieldMenu");
+  if (!menu) return;
+  menu.classList.add("hidden");
+  menu.hidden = true;
+  menu.innerHTML = "";
+  state.schemaFieldMenu = null;
+}
+
+function openSchemaFieldMenu({ field, objectName, anchorEl, clientX, clientY }) {
+  const menu = $("#schemaFieldMenu");
+  if (!menu || !field) return;
+  const parentTargets = Array.isArray(field.referenceTo) ? field.referenceTo.filter(Boolean) : [];
+  const edge = (state._schemaEdges || []).find(
+    (e) => e.fromObject === objectName && e.fromField === field.name
+  );
+  const items = [
+    { id: "copy-api", label: `Copy ${field.name}` },
+    { id: "copy-select", label: "Copy SELECT snippet" }
+  ];
+  if (edge) items.push({ id: "highlight-edge", label: "Highlight relationship line" });
+  if (parentTargets.length) {
+    items.push({ id: "query-parent", label: `Query via ${field.relationshipName || field.name}` });
+    items.push({
+      id: "open-parent",
+      label: parentTargets.length === 1 ? `Open ${parentTargets[0]}` : `Open ${parentTargets[0]}…`
+    });
+  }
+  items.push({ id: "query-field", label: "Query this field" });
+
+  menu.innerHTML = items
+    .map(
+      (it) =>
+        `<button type="button" class="schema-field-menu-item" role="menuitem" data-action="${it.id}">${escapeHtml(it.label)}</button>`
+    )
+    .join("");
+  menu.classList.remove("hidden");
+  menu.hidden = false;
+  state.schemaFieldMenu = { field, objectName };
+
+  const place = () => {
+    const pad = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    const rect = menu.getBoundingClientRect();
+    let x = clientX ?? (anchorEl?.getBoundingClientRect().left || 0);
+    let y = clientY ?? (anchorEl?.getBoundingClientRect().bottom || 0) + 4;
+    if (x + rect.width > vw - pad) x = Math.max(pad, vw - rect.width - pad);
+    if (y + rect.height > vh - pad) y = Math.max(pad, vh - rect.height - pad);
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+  };
+  place();
+
+  menu.querySelectorAll("[data-action]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const action = btn.getAttribute("data-action");
+      const describe = state.schemaDescribe;
+      hideSchemaFieldMenu();
+      if (action === "copy-api") {
+        try {
+          await navigator.clipboard.writeText(field.name);
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      if (action === "copy-select") {
+        const soql = `SELECT Id, ${field.name} FROM ${objectName} LIMIT 50`;
+        try {
+          await navigator.clipboard.writeText(soql);
+        } catch {
+          /* ignore */
+        }
+        previewSchemaSoql(soql);
+        return;
+      }
+      if (action === "highlight-edge" && edge) {
+        state.schemaHighlightedEdgeId = edge.id;
+        drawSchemaLines();
+        return;
+      }
+      if (action === "query-parent" && describe && parentTargets.length) {
+        const parent =
+          (state.schemaParents || []).find((p) => p.fieldName === field.name) || {
+            fieldName: field.name,
+            relationshipName: field.relationshipName || null,
+            targetObject: parentTargets[0],
+            type: field.type
+          };
+        openSoqlWithQuery(buildParentPathQuery(describe, parent));
+        return;
+      }
+      if (action === "open-parent" && parentTargets[0]) {
+        onLoadSchema({ resetTrail: false, sobject: parentTargets[0] }).catch(() => {});
+        return;
+      }
+      if (action === "query-field") {
+        openSoqlWithQuery(`SELECT Id, ${field.name} FROM ${objectName} LIMIT 50`);
+      }
+    });
+  });
 }
 
 function drawSchemaLines() {
@@ -2767,10 +3039,26 @@ function drawSchemaLines() {
     const dx = Math.max(40, Math.abs(x2 - x1) * 0.35);
     const c1x = x1 + (x2 >= x1 ? dx : -dx);
     const c2x = x2 + (x2 >= x1 ? -dx : dx);
+    const d = `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`;
+    const highlighted = state.schemaHighlightedEdgeId === edge.id;
+    const baseClass = edge.kind === "masterdetail" ? "sb-line sb-line-md" : "sb-line";
+
+    const hit = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    hit.setAttribute("d", d);
+    hit.setAttribute("class", "sb-line-hit");
+    hit.dataset.edgeId = edge.id;
+    hit.setAttribute("title", `${edge.fromObject}.${edge.fromField} → ${edge.toObject}`);
+    hit.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      onSchemaEdgeClick(edge);
+    });
+    svg.appendChild(hit);
+
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`);
-    path.setAttribute("class", edge.kind === "masterdetail" ? "sb-line sb-line-md" : "sb-line");
+    path.setAttribute("d", d);
+    path.setAttribute("class", `${baseClass}${highlighted ? " is-highlight" : ""}`);
     path.setAttribute("marker-end", `url(#${markerId}${edge.kind === "masterdetail" ? "-md" : ""})`);
+    path.dataset.edgeId = edge.id;
     svg.appendChild(path);
 
     // Crow's foot-ish tick at child end
@@ -2783,6 +3071,42 @@ function drawSchemaLines() {
   }
   void viewport;
   void world;
+}
+
+function onSchemaEdgeClick(edge) {
+  if (!edge) return;
+  state.schemaHighlightedEdgeId = edge.id;
+  drawSchemaLines();
+  const center = state.schemaDescribe;
+  if (!center) return;
+
+  // Parent lookup from center card
+  if (edge.fromObject === center.name) {
+    const parent =
+      (state.schemaParents || []).find((p) => p.fieldName === edge.fromField) || {
+        fieldName: edge.fromField,
+        relationshipName: null,
+        targetObject: edge.toObject,
+        type: edge.kind
+      };
+    openSoqlWithQuery(buildParentPathQuery(center, parent));
+    return;
+  }
+
+  // Child relationship into center
+  if (edge.toObject === center.name) {
+    const child =
+      (state.schemaChildren || []).find(
+        (c) => c.childObject === edge.fromObject && c.fieldName === edge.fromField
+      ) || {
+        childObject: edge.fromObject,
+        fieldName: edge.fromField,
+        relationshipName: null,
+        cascadeDelete: edge.kind === "masterdetail"
+      };
+    const soql = buildChildSubquery(center, child) || buildObjectQuery(center);
+    openSoqlWithQuery(soql);
+  }
 }
 
 function renderSchemaActions(describe) {

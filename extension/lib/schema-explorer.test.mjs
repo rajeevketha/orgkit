@@ -18,7 +18,8 @@ import {
   sessionObjectAccess,
   fieldSchemaBadges,
   summarizeSessionPermissions,
-  crudStripHtml
+  crudStripHtml,
+  buildUserPermOverlay
 } from "./schema-explorer.js";
 
 test("objectKind classifies standard, custom, and metadata", () => {
@@ -229,4 +230,70 @@ test("session CRUD and field badges from describe", () => {
   assert.equal(summary.fieldCounts.readable, 3);
   assert.equal(summary.fieldCounts.custom, 1);
   assert.match(crudStripHtml(access), /is-on/);
+});
+
+test("buildUserPermOverlay maps object and field permissions", () => {
+  const overlay = buildUserPermOverlay({
+    user: { Id: "005xx", Username: "ada@example.com", Name: "Ada" },
+    objectApiName: "Account",
+    objectPerms: [
+      {
+        PermissionsCreate: false,
+        PermissionsRead: true,
+        PermissionsEdit: true,
+        PermissionsDelete: false,
+        PermissionsViewAllRecords: false,
+        PermissionsModifyAllRecords: false
+      }
+    ],
+    fieldPerms: [
+      { Field: "Account.Name", PermissionsRead: true, PermissionsEdit: true },
+      { Field: "Account.Secret__c", PermissionsRead: false, PermissionsEdit: false }
+    ]
+  });
+  assert.equal(overlay.mode, "user");
+  assert.equal(overlay.objectAccess.read, true);
+  assert.equal(overlay.objectAccess.create, false);
+  assert.equal(overlay.fieldMap.Name.read, true);
+  assert.equal(overlay.fieldMap.Secret__c.read, false);
+
+  const name = fieldSchemaBadges(
+    { name: "Name", type: "string", updateable: true, custom: false },
+    overlay
+  );
+  assert.equal(name.readable, true);
+  assert.equal(name.editable, true);
+
+  const secret = fieldSchemaBadges(
+    { name: "Secret__c", type: "string", custom: true, updateable: true },
+    overlay
+  );
+  assert.equal(secret.readable, false);
+  assert.equal(secret.editable, false);
+
+  const industry = fieldSchemaBadges(
+    { name: "Industry", type: "picklist", updateable: true, custom: false },
+    overlay
+  );
+  assert.equal(industry.readable, true);
+  assert.equal(industry.editable, true);
+
+  const summary = summarizeSessionPermissions(
+    {
+      name: "Account",
+      createable: true,
+      updateable: true,
+      deletable: true,
+      queryable: true,
+      fields: [
+        { name: "Name", type: "string", updateable: true },
+        { name: "Secret__c", type: "string", custom: true, updateable: true },
+        { name: "Industry", type: "picklist", updateable: true }
+      ]
+    },
+    overlay
+  );
+  assert.equal(summary.access.create, false);
+  assert.equal(summary.fieldCounts.readable, 2);
+  assert.equal(summary.fieldCounts.editable, 2);
 });

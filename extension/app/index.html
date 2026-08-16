@@ -265,7 +265,7 @@
   <!-- FEATURE: Schema Explorer -->
   <section id="view-schema" class="view">
     <p class="lede">
-      Salesforce-style Schema Builder — object cards, relationship lines, and <strong>session permissions</strong> (CRUD / FLS badges).
+      Salesforce-style Schema Builder — object cards, relationship lines, session CRUD/FLS, and optional <strong>as-user</strong> overlays.
       Supports standard objects, custom (<code>__c</code>), and custom metadata (<code>__mdt</code>).
     </p>
     <div class="schema-filter-row" role="group" aria-label="Object type filter">
@@ -295,9 +295,9 @@
     <div id="schemaSummary" class="hint"></div>
     <div id="schemaBuilder" class="schema-builder hidden" aria-live="polite">
       <div class="schema-builder-toolbar">
-        <span class="hint" style="margin:0">Drag canvas to pan · scroll to zoom · click a card to focus</span>
+        <span class="hint" style="margin:0">Drag canvas to pan · scroll to zoom · click field/line for actions</span>
         <div class="row wrap" style="margin:0;gap:6px">
-          <button type="button" class="btn ghost" id="schemaTogglePerms" title="Session permissions drawer">Permissions</button>
+          <button type="button" class="btn ghost" id="schemaTogglePerms" title="Permissions drawer (session / as-user)">Permissions</button>
           <button type="button" class="btn ghost" id="schemaZoomOut" title="Zoom out">−</button>
           <button type="button" class="btn ghost" id="schemaZoomReset" title="Reset view">Reset</button>
           <button type="button" class="btn ghost" id="schemaZoomIn" title="Zoom in">+</button>
@@ -312,7 +312,7 @@
         </div>
         <aside class="schema-perm-drawer" id="schemaPermDrawer" hidden>
           <div class="schema-perm-drawer-head">
-            <strong>Session permissions</strong>
+            <strong>Permissions</strong>
             <button type="button" class="btn ghost" id="schemaPermClose" title="Close">×</button>
           </div>
           <div id="schemaPermBody" class="schema-perm-body"></div>
@@ -320,6 +320,7 @@
       </div>
       <div class="schema-actions" id="schemaActions"></div>
     </div>
+    <div id="schemaFieldMenu" class="schema-field-menu hidden" role="menu" hidden></div>
     <pre id="schemaSoqlPreview" class="result schema-soql-preview hidden"></pre>
   </section>
 
