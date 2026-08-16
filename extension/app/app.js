@@ -35,7 +35,9 @@ import {
   buildChildSubquery,
   schemaSummary,
   scoreSchemaObject,
-  pickDisplayFields
+  pickCardFields,
+  layoutSchemaGraph,
+  buildGraphEdges
 } from "../lib/schema-explorer.js";
 import { METADATA_SEARCH_TYPES, lightningBaseFromOrg } from "../lib/metadata-open.js";
 import { PACKAGE_TYPES, buildPackageXml, packageVersion } from "../lib/package-xml.js";
@@ -109,7 +111,7 @@ const FEATURES = [
   {
     id: "schema",
     title: "Schema Explorer",
-    blurb: "Parent/child map for standard, custom & metadata"
+    blurb: "Schema Builder canvas — cards, fields & relationship lines"
   },
   { id: "soql-run", title: "SOQL Runner", blurb: "Query standard & custom objects" },
   { id: "anon-apex", title: "Anonymous Apex", blurb: "Run Apex and view debug output" },
@@ -199,6 +201,9 @@ const state = {
   schemaParents: [],
   schemaChildren: [],
   schemaTrail: [],
+  schemaNeighbors: {},
+  schemaExpanded: {},
+  schemaView: { x: 0, y: 0, scale: 1 },
   packageSelections: [],
   packageMembersCache: [],
   lastPackageXml: "",
@@ -1231,6 +1236,9 @@ async function switchActiveSession(orgKey) {
     state.schemaParents = [];
     state.schemaChildren = [];
     state.schemaTrail = [];
+    state.schemaNeighbors = {};
+    state.schemaExpanded = {};
+    state.schemaView = { x: 0, y: 0, scale: 1 };
     state.globalObjects = null;
     state.lastQueryTables = { soql: null, nl: null };
     state.lastQueryRecords = { soql: null, nl: null };
@@ -2217,6 +2225,7 @@ function bindSchemaExplorer() {
       }
     });
   }
+  bindSchemaCanvasControls();
 }
 
 function hideSchemaObjectSuggest() {
@@ -2277,6 +2286,133 @@ function renderSchemaObjectSuggest() {
   });
 }
 
+function bindSchemaCanvasControls() {
+  $("#schemaZoomIn")?.addEventListener("click", () => {
+    state.schemaView.scale = Math.min(1.8, (state.schemaView.scale || 1) * 1.15);
+    applySchemaViewTransform();
+  });
+  $("#schemaZoomOut")?.addEventListener("click", () => {
+    state.schemaView.scale = Math.max(0.45, (state.schemaView.scale || 1) / 1.15);
+    applySchemaViewTransform();
+  });
+  $("#schemaZoomReset")?.addEventListener("click", () => {
+    fitSchemaView();
+  });
+
+  const viewport = $("#schemaViewport");
+  if (!viewport || viewport.dataset.bound === "1") return;
+  viewport.dataset.bound = "1";
+
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  viewport.addEventListener("pointerdown", (e) => {
+    if (e.target.closest?.(".sb-card") || e.target.closest?.("button")) return;
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    viewport.setPointerCapture?.(e.pointerId);
+    viewport.classList.add("is-panning");
+  });
+  viewport.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    state.schemaView.x += dx;
+    state.schemaView.y += dy;
+    applySchemaViewTransform();
+  });
+  const endDrag = () => {
+    dragging = false;
+    viewport.classList.remove("is-panning");
+  };
+  viewport.addEventListener("pointerup", endDrag);
+  viewport.addEventListener("pointercancel", endDrag);
+  viewport.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 1 / 1.08 : 1.08;
+      state.schemaView.scale = Math.min(1.8, Math.max(0.45, (state.schemaView.scale || 1) * factor));
+      applySchemaViewTransform();
+    },
+    { passive: false }
+  );
+}
+
+function applySchemaViewTransform() {
+  const world = $("#schemaWorld");
+  if (!world) return;
+  const { x = 0, y = 0, scale = 1 } = state.schemaView || {};
+  world.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+}
+
+function fitSchemaView() {
+  const viewport = $("#schemaViewport");
+  const cards = $("#schemaCards");
+  if (!viewport || !cards) return;
+  const nodes = [...cards.querySelectorAll(".sb-card")];
+  if (!nodes.length) {
+    state.schemaView = { x: 40, y: 24, scale: 1 };
+    applySchemaViewTransform();
+    return;
+  }
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const n of nodes) {
+    const left = Number(n.style.left.replace("px", "")) || 0;
+    const top = Number(n.style.top.replace("px", "")) || 0;
+    const w = n.offsetWidth || 260;
+    const h = n.offsetHeight || 220;
+    minX = Math.min(minX, left);
+    minY = Math.min(minY, top);
+    maxX = Math.max(maxX, left + w);
+    maxY = Math.max(maxY, top + h);
+  }
+  const pad = 48;
+  const vw = viewport.clientWidth || 800;
+  const vh = viewport.clientHeight || 520;
+  const bw = Math.max(1, maxX - minX + pad * 2);
+  const bh = Math.max(1, maxY - minY + pad * 2);
+  const scale = Math.min(1.15, Math.max(0.5, Math.min(vw / bw, vh / bh)));
+  state.schemaView = {
+    scale,
+    x: (vw - bw * scale) / 2 - (minX - pad) * scale,
+    y: (vh - bh * scale) / 2 - (minY - pad) * scale
+  };
+  applySchemaViewTransform();
+}
+
+async function describeSchemaNeighbor(sobject) {
+  const cached = state.schemaNeighbors?.[sobject];
+  if (cached) return cached;
+  try {
+    const res = await send("describeSObject", {
+      tabUrl: await requireTabUrl(),
+      sobject,
+      apiVersion: apiVersion()
+    });
+    if (!res.ok) throw new Error(res.error);
+    state.schemaNeighbors[sobject] = res.result;
+    return res.result;
+  } catch {
+    const stub = {
+      name: sobject,
+      label: sobject,
+      custom: /__c$|__mdt$/i.test(sobject),
+      fields: [],
+      childRelationships: [],
+      stub: true
+    };
+    state.schemaNeighbors[sobject] = stub;
+    return stub;
+  }
+}
+
 async function onLoadSchema({ resetTrail = true, sobject: forced } = {}) {
   const input = $("#schemaObjectSearch");
   const sobject = String(forced || input?.value || "").trim();
@@ -2287,8 +2423,8 @@ async function onLoadSchema({ resetTrail = true, sobject: forced } = {}) {
     return;
   }
   if (input) input.value = sobject;
-  $("#schemaSummary").textContent = "Loading schema…";
-  $("#schemaCanvas")?.classList.add("hidden");
+  $("#schemaSummary").textContent = "Loading schema canvas…";
+  $("#schemaBuilder")?.classList.add("hidden");
   $("#schemaSoqlPreview")?.classList.add("hidden");
   try {
     const res = await send("describeSObject", {
@@ -2299,10 +2435,12 @@ async function onLoadSchema({ resetTrail = true, sobject: forced } = {}) {
     if (!res.ok) throw new Error(res.error);
     const describe = res.result;
     state.schemaDescribe = describe;
+    state.schemaNeighbors = { ...(state.schemaNeighbors || {}), [describe.name]: describe };
     state.schemaParents = extractParentRelations(describe);
     state.schemaChildren = extractChildRelations(describe);
     if (resetTrail) {
       state.schemaTrail = [{ name: describe.name, label: describe.label || describe.name }];
+      state.schemaExpanded = {};
     } else {
       const last = state.schemaTrail[state.schemaTrail.length - 1];
       if (!last || last.name !== describe.name) {
@@ -2312,9 +2450,22 @@ async function onLoadSchema({ resetTrail = true, sobject: forced } = {}) {
         ].slice(-12);
       }
     }
+
+    // Prefetch neighbor describes for card field lists (cap for speed).
+    const parentNames = [...new Set(state.schemaParents.map((p) => p.targetObject))].slice(0, 6);
+    const childNames = [...new Set(state.schemaChildren.map((c) => c.childObject))]
+      .filter((n) => n !== describe.name)
+      .slice(0, 8);
+    $("#schemaSummary").textContent = `${schemaSummary(describe)} · loading related objects…`;
+    await Promise.all([...parentNames, ...childNames].map((n) => describeSchemaNeighbor(n)));
+
     $("#schemaSummary").textContent = schemaSummary(describe);
     renderSchemaExplorer();
-    $("#schemaCanvas")?.classList.remove("hidden");
+    $("#schemaBuilder")?.classList.remove("hidden");
+    requestAnimationFrame(() => {
+      drawSchemaLines();
+      fitSchemaView();
+    });
     await trackActivity({
       type: "describe",
       title: `Schema: ${describe.name}`,
@@ -2331,9 +2482,7 @@ function renderSchemaExplorer() {
   const describe = state.schemaDescribe;
   if (!describe) return;
   renderSchemaBreadcrumb();
-  renderSchemaCenter(describe);
-  renderSchemaParents(state.schemaParents || []);
-  renderSchemaChildren(state.schemaChildren || []);
+  renderSchemaCanvas(describe);
   renderSchemaActions(describe);
 }
 
@@ -2367,90 +2516,177 @@ function renderSchemaBreadcrumb() {
   });
 }
 
-function renderSchemaCenter(describe) {
-  const el = $("#schemaCenter");
-  if (!el) return;
+function renderSchemaCanvas(describe) {
+  const cardsHost = $("#schemaCards");
+  const lines = $("#schemaLines");
+  if (!cardsHost || !lines) return;
+
+  const parentNames = [...new Set((state.schemaParents || []).map((p) => p.targetObject))].slice(0, 6);
+  const childNames = [...new Set((state.schemaChildren || []).map((c) => c.childObject))]
+    .filter((n) => n !== describe.name)
+    .slice(0, 8);
+
+  const positions = layoutSchemaGraph({
+    centerName: describe.name,
+    parentNames,
+    childNames,
+    cardWidth: 268,
+    gapX: 40,
+    gapY: 80,
+    centerY: 300
+  });
+
+  // Normalize so min x/y start near 0 for easier fitting.
+  let minX = Infinity;
+  let minY = Infinity;
+  for (const pos of positions.values()) {
+    minX = Math.min(minX, pos.x);
+    minY = Math.min(minY, pos.y);
+  }
+  if (!Number.isFinite(minX)) minX = 0;
+  if (!Number.isFinite(minY)) minY = 0;
+  const offsetX = 40 - minX;
+  const offsetY = 40 - minY;
+
+  cardsHost.replaceChildren();
+  for (const [name, pos] of positions.entries()) {
+    const desc =
+      name === describe.name ? describe : state.schemaNeighbors?.[name] || { name, label: name, fields: [] };
+    const card = buildSchemaCard(desc, pos.role === "center");
+    card.style.left = `${pos.x + offsetX}px`;
+    card.style.top = `${pos.y + offsetY}px`;
+    cardsHost.appendChild(card);
+  }
+
+  state._schemaEdges = buildGraphEdges({
+    centerName: describe.name,
+    parents: (state.schemaParents || []).filter((p) => parentNames.includes(p.targetObject)),
+    children: (state.schemaChildren || []).filter((c) => childNames.includes(c.childObject))
+  });
+  state._schemaLayoutOffset = { x: offsetX, y: offsetY };
+}
+
+function buildSchemaCard(describe, isCenter) {
   const kind = objectKind(describe.name, !!describe.custom);
-  const fields = pickDisplayFields(describe);
-  const fieldCount = describe.fields?.length || 0;
-  el.innerHTML = `
-    <div class="schema-node schema-node-center ${objectKindClass(kind)}">
-      <span class="schema-kind">${escapeHtml(kind)}</span>
-      <strong>${escapeHtml(describe.name)}</strong>
-      <span class="schema-node-meta">${escapeHtml(describe.label || describe.name)}</span>
-      <span class="schema-node-meta">${fieldCount} fields · keyPrefix ${escapeHtml(describe.keyPrefix || "—")}</span>
-      <span class="schema-node-meta">Sample: ${escapeHtml(fields.join(", "))}</span>
-    </div>`;
+  const expanded = !!state.schemaExpanded?.[describe.name];
+  const fields = pickCardFields(describe, { max: isCenter ? 12 : 8, expanded });
+  const total = describe.fields?.length || 0;
+  const card = document.createElement("div");
+  card.className = `sb-card ${objectKindClass(kind)}${isCenter ? " is-center" : ""}`;
+  card.dataset.object = describe.name;
+  card.innerHTML = `
+    <div class="sb-card-head" title="Focus ${escapeHtml(describe.name)}">
+      <div>
+        <span class="sb-kind">${escapeHtml(kind)}</span>
+        <strong>${escapeHtml(describe.label || describe.name)}</strong>
+        <span class="sb-api">${escapeHtml(describe.name)}</span>
+      </div>
+    </div>
+    <div class="sb-fields">
+      ${
+        fields.length
+          ? fields
+              .map((f) => {
+                const rel = f.referenceTo?.length ? " is-rel" : "";
+                const req = !f.nillable && f.createable ? " is-required" : "";
+                return `<div class="sb-field${rel}${req}" data-field="${escapeHtml(f.name)}" data-object="${escapeHtml(describe.name)}">
+                  <span class="sb-field-name">${escapeHtml(f.label || f.name)}</span>
+                  <span class="sb-field-type">${escapeHtml(formatFieldType(f))}</span>
+                </div>`;
+              })
+              .join("")
+          : `<div class="sb-field muted"><span class="sb-field-name">${describe.stub ? "Describe unavailable" : "No fields"}</span></div>`
+      }
+    </div>
+    ${
+      total > fields.length || expanded
+        ? `<button type="button" class="sb-more" data-expand="${escapeHtml(describe.name)}">${
+            expanded ? "Show fewer fields" : `Show more fields (${total - fields.length})`
+          }</button>`
+        : total
+          ? `<div class="sb-more-static">${total} fields</div>`
+          : ""
+    }
+  `;
+
+  card.querySelector(".sb-card-head")?.addEventListener("click", () => {
+    if (describe.name === state.schemaDescribe?.name) return;
+    onLoadSchema({ resetTrail: false, sobject: describe.name }).catch(() => {});
+  });
+  card.querySelector("[data-expand]")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const name = e.currentTarget.getAttribute("data-expand");
+    state.schemaExpanded[name] = !state.schemaExpanded[name];
+    renderSchemaExplorer();
+    requestAnimationFrame(() => drawSchemaLines());
+  });
+  return card;
 }
 
-function renderSchemaParents(parents) {
-  const root = $("#schemaParents");
-  if (!root) return;
-  if (!parents.length) {
-    root.innerHTML = `<p class="hint">No parent lookups on this object.</p>`;
-    return;
+function drawSchemaLines() {
+  const svg = $("#schemaLines");
+  const cardsHost = $("#schemaCards");
+  const viewport = $("#schemaViewport");
+  if (!svg || !cardsHost) return;
+  const edges = state._schemaEdges || [];
+  const world = $("#schemaWorld");
+  // Size SVG to content box
+  let maxX = 800;
+  let maxY = 600;
+  for (const card of cardsHost.querySelectorAll(".sb-card")) {
+    const left = card.offsetLeft + card.offsetWidth;
+    const top = card.offsetTop + card.offsetHeight;
+    maxX = Math.max(maxX, left + 80);
+    maxY = Math.max(maxY, top + 80);
   }
-  root.innerHTML = parents
-    .map((p, i) => {
-      const kind = objectKind(p.targetObject);
-      return `<button type="button" class="schema-node ${objectKindClass(kind)}" data-schema-parent="${i}">
-        <span class="schema-kind">${escapeHtml(kind)}</span>
-        <strong>${escapeHtml(p.targetObject)}</strong>
-        <span class="schema-node-meta">${escapeHtml(p.fieldName)}${p.relationshipName ? ` · ${escapeHtml(p.relationshipName)}` : ""}</span>
-        <span class="schema-node-meta">${escapeHtml(p.type)}${p.nillable ? "" : " · required"}</span>
-      </button>`;
-    })
-    .join("");
-  root.querySelectorAll("[data-schema-parent]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const p = parents[Number(btn.getAttribute("data-schema-parent"))];
-      if (!p) return;
-      onLoadSchema({ resetTrail: false, sobject: p.targetObject }).catch(() => {});
-    });
-    btn.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      const p = parents[Number(btn.getAttribute("data-schema-parent"))];
-      if (!p || !state.schemaDescribe) return;
-      const soql = buildParentPathQuery(state.schemaDescribe, p);
-      previewSchemaSoql(soql);
-    });
-  });
-}
+  svg.setAttribute("width", String(maxX));
+  svg.setAttribute("height", String(maxY));
+  svg.style.width = `${maxX}px`;
+  svg.style.height = `${maxY}px`;
+  svg.innerHTML = "";
 
-function renderSchemaChildren(children) {
-  const root = $("#schemaChildren");
-  if (!root) return;
-  if (!children.length) {
-    root.innerHTML = `<p class="hint">No child relationships returned for this object.</p>`;
-    return;
+  const markerId = "sb-arrow";
+  svg.innerHTML = `<defs>
+    <marker id="${markerId}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b9bd5"></path>
+    </marker>
+    <marker id="${markerId}-md" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e07a5f"></path>
+    </marker>
+  </defs>`;
+
+  for (const edge of edges) {
+    const fromField = cardsHost.querySelector(
+      `.sb-field[data-object="${CSS.escape(edge.fromObject)}"][data-field="${CSS.escape(edge.fromField)}"]`
+    );
+    const toCard = cardsHost.querySelector(`.sb-card[data-object="${CSS.escape(edge.toObject)}"]`);
+    if (!toCard) continue;
+    const fromEl = fromField || cardsHost.querySelector(`.sb-card[data-object="${CSS.escape(edge.fromObject)}"]`);
+    if (!fromEl) continue;
+
+    const x1 = fromEl.offsetLeft + (fromField ? fromEl.offsetWidth : fromEl.offsetWidth / 2);
+    const y1 = fromEl.offsetTop + fromEl.offsetHeight / 2;
+    const x2 = toCard.offsetLeft + toCard.offsetWidth / 2;
+    const y2 = toCard.offsetTop + 18;
+    const dx = Math.max(40, Math.abs(x2 - x1) * 0.35);
+    const c1x = x1 + (x2 >= x1 ? dx : -dx);
+    const c2x = x2 + (x2 >= x1 ? -dx : dx);
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`);
+    path.setAttribute("class", edge.kind === "masterdetail" ? "sb-line sb-line-md" : "sb-line");
+    path.setAttribute("marker-end", `url(#${markerId}${edge.kind === "masterdetail" ? "-md" : ""})`);
+    svg.appendChild(path);
+
+    // Crow's foot-ish tick at child end
+    const tick = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    tick.setAttribute("cx", String(x1));
+    tick.setAttribute("cy", String(y1));
+    tick.setAttribute("r", "3.5");
+    tick.setAttribute("class", edge.kind === "masterdetail" ? "sb-line-dot sb-line-md" : "sb-line-dot");
+    svg.appendChild(tick);
   }
-  root.innerHTML = children
-    .map((c, i) => {
-      const kind = objectKind(c.childObject);
-      const rel = c.relationshipName || "(no relationship name)";
-      return `<button type="button" class="schema-node ${objectKindClass(kind)}" data-schema-child="${i}">
-        <span class="schema-kind">${escapeHtml(kind)}</span>
-        <strong>${escapeHtml(c.childObject)}</strong>
-        <span class="schema-node-meta">${escapeHtml(rel)}</span>
-        <span class="schema-node-meta">via ${escapeHtml(c.fieldName || "—")}${c.cascadeDelete ? " · cascade" : ""}</span>
-      </button>`;
-    })
-    .join("");
-  root.querySelectorAll("[data-schema-child]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const c = children[Number(btn.getAttribute("data-schema-child"))];
-      if (!c) return;
-      onLoadSchema({ resetTrail: false, sobject: c.childObject }).catch(() => {});
-    });
-    btn.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      const c = children[Number(btn.getAttribute("data-schema-child"))];
-      if (!c || !state.schemaDescribe) return;
-      const soql = buildChildSubquery(state.schemaDescribe, c);
-      if (soql) previewSchemaSoql(soql);
-      else previewSchemaSoql(`-- Child ${c.childObject} has no relationshipName for subqueries`);
-    });
-  });
+  void viewport;
+  void world;
 }
 
 function renderSchemaActions(describe) {
@@ -2463,8 +2699,7 @@ function renderSchemaActions(describe) {
     <button type="button" class="btn ghost" id="schemaCopyName">Copy API name</button>
   `;
   $("#schemaQueryObject")?.addEventListener("click", () => {
-    const soql = buildObjectQuery(describe);
-    openSoqlWithQuery(soql);
+    openSoqlWithQuery(buildObjectQuery(describe));
   });
   $("#schemaOpenDescribe")?.addEventListener("click", () => {
     const search = $("#describeObjectSearch");
@@ -2492,7 +2727,6 @@ function renderSchemaActions(describe) {
     }
   });
 
-  // Parent/child quick query buttons under lists when relations exist
   if (state.schemaParents?.length) {
     const first = state.schemaParents[0];
     const btn = document.createElement("button");
@@ -2500,8 +2734,7 @@ function renderSchemaActions(describe) {
     btn.className = "btn";
     btn.textContent = `Query via ${first.relationshipName || first.fieldName}`;
     btn.addEventListener("click", () => {
-      const soql = buildParentPathQuery(describe, first);
-      openSoqlWithQuery(soql);
+      openSoqlWithQuery(buildParentPathQuery(describe, first));
     });
     root.appendChild(btn);
   }

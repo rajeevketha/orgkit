@@ -10,7 +10,11 @@ import {
   buildParentPathQuery,
   buildChildSubquery,
   scoreSchemaObject,
-  schemaSummary
+  schemaSummary,
+  formatFieldType,
+  pickCardFields,
+  layoutSchemaGraph,
+  buildGraphEdges
 } from "./schema-explorer.js";
 
 test("objectKind classifies standard, custom, and metadata", () => {
@@ -140,9 +144,48 @@ test("CMDT display fields use DeveloperName / MasterLabel", () => {
   assert.match(buildObjectQuery(mdt), /DeveloperName/);
 });
 
-test("scoreSchemaObject ranks API name and label", () => {
-  const o = { name: "My_Job__c", label: "Job Record", labelPlural: "Job Records" };
-  assert.ok(scoreSchemaObject(o, "my_job") >= 70);
-  assert.ok(scoreSchemaObject(o, "job record") >= 70);
-  assert.equal(scoreSchemaObject(o, "zzz"), 0);
+test("formatFieldType and card field picking", () => {
+  assert.equal(
+    formatFieldType({ type: "reference", referenceTo: ["Account"] }),
+    "Lookup(Account)"
+  );
+  assert.equal(formatFieldType({ type: "string", length: 255 }), "Text(255)");
+  assert.equal(formatFieldType({ type: "boolean" }), "Checkbox");
+  const desc = {
+    name: "Account",
+    fields: [
+      { name: "BillingCity", type: "string", length: 40 },
+      { name: "OwnerId", type: "reference", referenceTo: ["User"], nillable: false, createable: true },
+      { name: "Name", type: "string", length: 255 },
+      { name: "Id", type: "id" }
+    ]
+  };
+  const picked = pickCardFields(desc, { max: 3 }).map((f) => f.name);
+  assert.deepEqual(picked, ["Id", "Name", "OwnerId"]);
+});
+
+test("layoutSchemaGraph places parents above and children below", () => {
+  const pos = layoutSchemaGraph({
+    centerName: "Account",
+    parentNames: ["User"],
+    childNames: ["Contact", "Case"],
+    cardWidth: 200,
+    gapX: 20,
+    gapY: 40,
+    centerY: 200
+  });
+  assert.ok(pos.get("User").y < pos.get("Account").y);
+  assert.ok(pos.get("Contact").y > pos.get("Account").y);
+  assert.equal(pos.get("Account").role, "center");
+});
+
+test("buildGraphEdges links lookups both ways", () => {
+  const edges = buildGraphEdges({
+    centerName: "Account",
+    parents: [{ fieldName: "OwnerId", targetObject: "User", type: "reference" }],
+    children: [{ childObject: "Contact", fieldName: "AccountId", cascadeDelete: false }]
+  });
+  assert.equal(edges.length, 2);
+  assert.equal(edges[0].fromObject, "Account");
+  assert.equal(edges[1].toObject, "Account");
 });

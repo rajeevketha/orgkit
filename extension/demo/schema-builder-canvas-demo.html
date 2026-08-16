@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OrgKit Schema Builder — canvas demo</title>
+  <link rel="stylesheet" href="../app/app.css" />
+  <style>
+    body { padding: 16px; min-height: 100vh; overflow: auto; height: auto; width: auto; display: block; }
+    h1 { margin: 0 0 6px; font-size: 18px; }
+    .note { color: var(--muted); margin: 0 0 12px; }
+  </style>
+</head>
+<body>
+  <h1>Schema Builder canvas demo</h1>
+  <p class="note">Same card + relationship-line UI as OrgKit 1.9.1 — sample Account graph (no Salesforce login required).</p>
+  <div class="schema-builder" id="schemaBuilder">
+    <div class="schema-builder-toolbar">
+      <span class="hint" style="margin:0">Drag to pan · scroll to zoom · click a card header to focus</span>
+      <div class="row wrap" style="margin:0;gap:6px">
+        <button type="button" class="btn ghost" id="schemaZoomOut">−</button>
+        <button type="button" class="btn ghost" id="schemaZoomReset">Reset</button>
+        <button type="button" class="btn ghost" id="schemaZoomIn">+</button>
+      </div>
+    </div>
+    <div class="schema-viewport" id="schemaViewport">
+      <div class="schema-world" id="schemaWorld">
+        <svg class="schema-lines" id="schemaLines" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="schema-cards" id="schemaCards"></div>
+      </div>
+    </div>
+    <div class="schema-actions" id="schemaActions"></div>
+  </div>
+  <pre id="soql" class="result" style="margin-top:12px"></pre>
+  <script type="module">
+    import {
+      objectKind, objectKindClass, extractParentRelations, extractChildRelations,
+      formatFieldType, pickCardFields, layoutSchemaGraph, buildGraphEdges, buildObjectQuery
+    } from "../lib/schema-explorer.js";
+
+    const DESCRIBES = {
+      Account: {
+        name: "Account", label: "Account", custom: false, keyPrefix: "001",
+        fields: [
+          { name: "Id", type: "id", label: "Account ID" },
+          { name: "Name", type: "string", length: 255, label: "Account Name", nillable: false, createable: true },
+          { name: "Phone", type: "phone", label: "Account Phone" },
+          { name: "OwnerId", label: "Owner", type: "reference", relationshipName: "Owner", referenceTo: ["User"], nillable: false, createable: true },
+          { name: "ParentId", label: "Parent Account", type: "reference", relationshipName: "Parent", referenceTo: ["Account"], nillable: true, createable: true },
+          { name: "Industry", type: "picklist", label: "Industry" }
+        ],
+        childRelationships: [
+          { childSObject: "Contact", field: "AccountId", relationshipName: "Contacts" },
+          { childSObject: "Opportunity", field: "AccountId", relationshipName: "Opportunities" },
+          { childSObject: "Job__c", field: "Account__c", relationshipName: "Jobs__r" }
+        ]
+      },
+      User: {
+        name: "User", label: "User", custom: false,
+        fields: [
+          { name: "Id", type: "id", label: "User ID" },
+          { name: "Name", type: "string", length: 121, label: "Full Name" },
+          { name: "Username", type: "string", length: 80, label: "Username" },
+          { name: "Email", type: "email", label: "Email" }
+        ],
+        childRelationships: []
+      },
+      Contact: {
+        name: "Contact", label: "Contact", custom: false,
+        fields: [
+          { name: "Id", type: "id", label: "Contact ID" },
+          { name: "Name", type: "string", length: 121, label: "Full Name" },
+          { name: "AccountId", label: "Account", type: "reference", relationshipName: "Account", referenceTo: ["Account"], nillable: true, createable: true },
+          { name: "Email", type: "email", label: "Email" },
+          { name: "Phone", type: "phone", label: "Business Phone" }
+        ],
+        childRelationships: []
+      },
+      Opportunity: {
+        name: "Opportunity", label: "Opportunity", custom: false,
+        fields: [
+          { name: "Id", type: "id", label: "Opportunity ID" },
+          { name: "Name", type: "string", length: 120, label: "Name", nillable: false, createable: true },
+          { name: "AccountId", label: "Account", type: "reference", relationshipName: "Account", referenceTo: ["Account"] },
+          { name: "Amount", type: "currency", precision: 16, scale: 2, label: "Amount" },
+          { name: "StageName", type: "picklist", label: "Stage" }
+        ],
+        childRelationships: []
+      },
+      Job__c: {
+        name: "Job__c", label: "Job", custom: true,
+        fields: [
+          { name: "Id", type: "id", label: "Record ID" },
+          { name: "Name", type: "string", length: 80, label: "Job Name", nillable: false, createable: true },
+          { name: "Account__c", label: "Account", type: "reference", relationshipName: "Account__r", referenceTo: ["Account"] },
+          { name: "Status__c", type: "picklist", label: "Status" }
+        ],
+        childRelationships: []
+      }
+    };
+
+    let center = "Account";
+    let view = { x: 40, y: 20, scale: 0.92 };
+
+    function applyTransform() {
+      document.getElementById("schemaWorld").style.transform =
+        `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+    }
+
+    function render(name) {
+      center = name;
+      const describe = DESCRIBES[name];
+      const parents = extractParentRelations(describe);
+      const children = extractChildRelations(describe);
+      const parentNames = [...new Set(parents.map((p) => p.targetObject))].filter((n) => DESCRIBES[n]).slice(0, 6);
+      const childNames = [...new Set(children.map((c) => c.childObject))].filter((n) => DESCRIBES[n] && n !== name).slice(0, 8);
+      const positions = layoutSchemaGraph({ centerName: name, parentNames, childNames, cardWidth: 268, gapX: 40, gapY: 80, centerY: 300 });
+      let minX = Infinity, minY = Infinity;
+      for (const p of positions.values()) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); }
+      const ox = 40 - minX, oy = 40 - minY;
+      const host = document.getElementById("schemaCards");
+      host.replaceChildren();
+      for (const [obj, pos] of positions) {
+        const d = DESCRIBES[obj];
+        const kind = objectKind(d.name, !!d.custom);
+        const fields = pickCardFields(d, { max: obj === name ? 12 : 8 });
+        const card = document.createElement("div");
+        card.className = `sb-card ${objectKindClass(kind)}${obj === name ? " is-center" : ""}`;
+        card.dataset.object = obj;
+        card.style.left = `${pos.x + ox}px`;
+        card.style.top = `${pos.y + oy}px`;
+        card.innerHTML = `
+          <div class="sb-card-head">
+            <div>
+              <span class="sb-kind">${kind}</span>
+              <strong>${d.label}</strong>
+              <span class="sb-api">${d.name}</span>
+            </div>
+          </div>
+          <div class="sb-fields">
+            ${fields.map((f) => `
+              <div class="sb-field${f.referenceTo?.length ? " is-rel" : ""}${!f.nillable && f.createable ? " is-required" : ""}" data-object="${d.name}" data-field="${f.name}">
+                <span class="sb-field-name">${f.label || f.name}</span>
+                <span class="sb-field-type">${formatFieldType(f)}</span>
+              </div>`).join("")}
+          </div>`;
+        card.querySelector(".sb-card-head").addEventListener("click", () => render(obj));
+        host.appendChild(card);
+      }
+      const edges = buildGraphEdges({
+        centerName: name,
+        parents: parents.filter((p) => parentNames.includes(p.targetObject)),
+        children: children.filter((c) => childNames.includes(c.childObject))
+      });
+      drawLines(edges);
+      document.getElementById("schemaActions").innerHTML = `
+        <button type="button" class="btn primary" id="q">Query this object</button>
+        <span class="hint" style="margin:0">Focused: <strong>${name}</strong></span>`;
+      document.getElementById("q").onclick = () => {
+        document.getElementById("soql").textContent = buildObjectQuery(describe);
+      };
+      document.getElementById("soql").textContent = buildObjectQuery(describe);
+      applyTransform();
+    }
+
+    function drawLines(edges) {
+      const svg = document.getElementById("schemaLines");
+      const host = document.getElementById("schemaCards");
+      let maxX = 900, maxY = 700;
+      for (const card of host.querySelectorAll(".sb-card")) {
+        maxX = Math.max(maxX, card.offsetLeft + card.offsetWidth + 80);
+        maxY = Math.max(maxY, card.offsetTop + card.offsetHeight + 80);
+      }
+      svg.setAttribute("width", maxX);
+      svg.setAttribute("height", maxY);
+      svg.style.width = maxX + "px";
+      svg.style.height = maxY + "px";
+      svg.innerHTML = `<defs>
+        <marker id="sb-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b9bd5"></path>
+        </marker>
+      </defs>`;
+      for (const edge of edges) {
+        const fromField = host.querySelector(`.sb-field[data-object="${edge.fromObject}"][data-field="${edge.fromField}"]`);
+        const fromCard = host.querySelector(`.sb-card[data-object="${edge.fromObject}"]`);
+        const toCard = host.querySelector(`.sb-card[data-object="${edge.toObject}"]`);
+        const fromEl = fromField || fromCard;
+        if (!fromEl || !toCard) continue;
+        const x1 = fromEl.offsetLeft + (fromField ? fromEl.offsetWidth : fromEl.offsetWidth / 2);
+        const y1 = fromEl.offsetTop + fromEl.offsetHeight / 2;
+        const x2 = toCard.offsetLeft + toCard.offsetWidth / 2;
+        const y2 = toCard.offsetTop + 18;
+        const dx = Math.max(40, Math.abs(x2 - x1) * 0.35);
+        const c1x = x1 + (x2 >= x1 ? dx : -dx);
+        const c2x = x2 + (x2 >= x1 ? -dx : dx);
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`);
+        path.setAttribute("class", "sb-line");
+        path.setAttribute("marker-end", "url(#sb-arrow)");
+        svg.appendChild(path);
+      }
+    }
+
+    const vp = document.getElementById("schemaViewport");
+    let dragging = false, lx = 0, ly = 0;
+    vp.addEventListener("pointerdown", (e) => {
+      if (e.target.closest(".sb-card")) return;
+      dragging = true; lx = e.clientX; ly = e.clientY; vp.classList.add("is-panning");
+    });
+    vp.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      view.x += e.clientX - lx; view.y += e.clientY - ly; lx = e.clientX; ly = e.clientY; applyTransform();
+    });
+    vp.addEventListener("pointerup", () => { dragging = false; vp.classList.remove("is-panning"); });
+    vp.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      view.scale = Math.min(1.6, Math.max(0.5, view.scale * (e.deltaY > 0 ? 1/1.08 : 1.08)));
+      applyTransform();
+    }, { passive: false });
+    document.getElementById("schemaZoomIn").onclick = () => { view.scale = Math.min(1.6, view.scale * 1.15); applyTransform(); };
+    document.getElementById("schemaZoomOut").onclick = () => { view.scale = Math.max(0.5, view.scale / 1.15); applyTransform(); };
+    document.getElementById("schemaZoomReset").onclick = () => { view = { x: 40, y: 20, scale: 0.92 }; applyTransform(); };
+
+    render("Account");
+  </script>
+</body>
+</html>

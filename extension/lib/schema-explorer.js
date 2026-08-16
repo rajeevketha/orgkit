@@ -193,3 +193,139 @@ export function scoreSchemaObject(o, query) {
   if (q.endsWith("__mdt") && name === q) return 100;
   return 0;
 }
+
+/** Salesforce-like field type label for Schema Builder cards. */
+export function formatFieldType(field) {
+  if (!field) return "";
+  const t = String(field.type || "").toLowerCase();
+  const refs = Array.isArray(field.referenceTo) ? field.referenceTo : [];
+  if (refs.length) {
+    const join = refs.join(", ");
+    if (t === "masterdetail" || t === "master-detail") return `Master-Detail(${join})`;
+    return `Lookup(${join})`;
+  }
+  if (t === "string" || t === "textarea") {
+    const len = field.length != null ? field.length : "";
+    return len !== "" ? `Text(${len})` : t === "textarea" ? "Text Area" : "Text";
+  }
+  if (t === "double" || t === "currency" || t === "percent") {
+    const p = field.precision != null ? field.precision : "";
+    const s = field.scale != null ? field.scale : "";
+    if (p !== "" && s !== "") {
+      const label = t === "currency" ? "Currency" : t === "percent" ? "Percent" : "Number";
+      return `${label}(${p}, ${s})`;
+    }
+  }
+  const map = {
+    boolean: "Checkbox",
+    int: "Number",
+    datetime: "Date/Time",
+    date: "Date",
+    email: "Email",
+    phone: "Phone",
+    url: "URL",
+    id: "ID",
+    reference: "Lookup",
+    picklist: "Picklist",
+    multipicklist: "Picklist (Multi-Select)",
+    address: "Address",
+    location: "Geolocation",
+    encryptedstring: "Encrypted Text",
+    base64: "Base64",
+    combobox: "Combobox",
+    time: "Time"
+  };
+  return map[t] || field.type || "";
+}
+
+/**
+ * Choose which fields appear on a Schema Builder card.
+ * Relationship fields always prioritized; expanded shows more.
+ */
+export function pickCardFields(describe, { max = 10, expanded = false } = {}) {
+  const fields = Array.isArray(describe?.fields) ? [...describe.fields] : [];
+  const limit = expanded ? Math.min(fields.length, 40) : max;
+  const score = (f) => {
+    let s = 0;
+    if (f.name === "Id") s += 200;
+    if (["Name", "DeveloperName", "MasterLabel", "Subject", "CaseNumber"].includes(f.name)) s += 150;
+    if (f.referenceTo?.length) s += 80;
+    if (!f.nillable && f.createable) s += 40;
+    if (f.custom) s += 5;
+    if (f.type === "masterdetail") s += 15;
+    return s;
+  };
+  return fields
+    .filter((f) => f?.name)
+    .sort((a, b) => score(b) - score(a) || String(a.name).localeCompare(String(b.name)))
+    .slice(0, limit);
+}
+
+/**
+ * Auto-layout: center object, parents above, children below (Salesforce Schema Builder–like).
+ * @returns {Map<string, { x: number, y: number, role: string }>}
+ */
+export function layoutSchemaGraph({
+  centerName,
+  parentNames = [],
+  childNames = [],
+  cardWidth = 260,
+  gapX = 36,
+  gapY = 72,
+  centerY = 320
+} = {}) {
+  /** @type {Map<string, { x: number, y: number, role: string }>} */
+  const positions = new Map();
+  const parents = [...new Set(parentNames.filter(Boolean))];
+  const children = [...new Set(childNames.filter(Boolean).filter((n) => n !== centerName))];
+
+  const placeRow = (names, y, role) => {
+    const n = names.length;
+    if (!n) return;
+    const totalW = n * cardWidth + (n - 1) * gapX;
+    let x = -totalW / 2;
+    for (const name of names) {
+      positions.set(name, { x, y, role });
+      x += cardWidth + gapX;
+    }
+  };
+
+  placeRow(parents, 24, "parent");
+  positions.set(centerName, {
+    x: -cardWidth / 2,
+    y: parents.length ? centerY : 24,
+    role: "center"
+  });
+  const childY = (positions.get(centerName)?.y || centerY) + 280 + gapY;
+  placeRow(children, childY, "child");
+  return positions;
+}
+
+/**
+ * Edges for SVG connectors (child lookup field → parent object).
+ */
+export function buildGraphEdges({ centerName, parents = [], children = [] } = {}) {
+  /** @type {Array<{ id: string, fromObject: string, fromField: string, toObject: string, kind: string }>} */
+  const edges = [];
+  for (const p of parents) {
+    if (!p?.targetObject || !p?.fieldName) continue;
+    edges.push({
+      id: `${centerName}.${p.fieldName}->${p.targetObject}`,
+      fromObject: centerName,
+      fromField: p.fieldName,
+      toObject: p.targetObject,
+      kind: String(p.type || "").toLowerCase() === "masterdetail" ? "masterdetail" : "lookup"
+    });
+  }
+  for (const c of children) {
+    if (!c?.childObject || !c?.fieldName) continue;
+    edges.push({
+      id: `${c.childObject}.${c.fieldName}->${centerName}`,
+      fromObject: c.childObject,
+      fromField: c.fieldName,
+      toObject: centerName,
+      kind: c.cascadeDelete ? "masterdetail" : "lookup"
+    });
+  }
+  return edges;
+}
