@@ -39,6 +39,8 @@ import {
   pickCardFields,
   layoutSchemaGraph,
   buildGraphEdges,
+  routeRelationshipPath,
+  edgeLabelText,
   sessionObjectAccess,
   fieldSchemaBadges,
   summarizeSessionPermissions,
@@ -215,6 +217,7 @@ const state = {
   schemaAsUser: null,
   schemaAsUserOverlays: {},
   schemaHighlightedEdgeId: "",
+  schemaCardPositions: {},
   schemaFieldMenu: null,
   packageSelections: [],
   packageMembersCache: [],
@@ -1251,6 +1254,7 @@ async function switchActiveSession(orgKey) {
     state.schemaNeighbors = {};
     state.schemaExpanded = {};
     state.schemaView = { x: 0, y: 0, scale: 1 };
+    state.schemaCardPositions = {};
     state.schemaAsUserKey = "";
     state.schemaAsUser = null;
     state.schemaAsUserOverlays = {};
@@ -2316,6 +2320,15 @@ function bindSchemaCanvasControls() {
   $("#schemaZoomReset")?.addEventListener("click", () => {
     fitSchemaView();
   });
+  $("#schemaResetLayout")?.addEventListener("click", () => {
+    state.schemaCardPositions = {};
+    state.schemaHighlightedEdgeId = "";
+    renderSchemaExplorer();
+    requestAnimationFrame(() => {
+      drawSchemaLines();
+      fitSchemaView();
+    });
+  });
   $("#schemaTogglePerms")?.addEventListener("click", () => {
     state.schemaPermDrawerOpen = !state.schemaPermDrawerOpen;
     applySchemaPermDrawer();
@@ -2480,6 +2493,7 @@ async function onLoadSchema({ resetTrail = true, sobject: forced } = {}) {
     if (resetTrail) {
       state.schemaTrail = [{ name: describe.name, label: describe.label || describe.name }];
       state.schemaExpanded = {};
+      state.schemaCardPositions = {};
     } else {
       const last = state.schemaTrail[state.schemaTrail.length - 1];
       if (!last || last.name !== describe.name) {
@@ -2494,7 +2508,7 @@ async function onLoadSchema({ resetTrail = true, sobject: forced } = {}) {
     const parentNames = [...new Set(state.schemaParents.map((p) => p.targetObject))].slice(0, 6);
     const childNames = [...new Set(state.schemaChildren.map((c) => c.childObject))]
       .filter((n) => n !== describe.name)
-      .slice(0, 8);
+      .slice(0, 12);
     $("#schemaSummary").textContent = `${schemaSummary(describe)} · loading related objects…`;
     await Promise.all([...parentNames, ...childNames].map((n) => describeSchemaNeighbor(n)));
 
@@ -2740,16 +2754,18 @@ function renderSchemaCanvas(describe) {
   const parentNames = [...new Set((state.schemaParents || []).map((p) => p.targetObject))].slice(0, 6);
   const childNames = [...new Set((state.schemaChildren || []).map((c) => c.childObject))]
     .filter((n) => n !== describe.name)
-    .slice(0, 8);
+    .slice(0, 12);
 
   const positions = layoutSchemaGraph({
     centerName: describe.name,
     parentNames,
     childNames,
-    cardWidth: 268,
-    gapX: 40,
-    gapY: 80,
-    centerY: 300
+    cardWidth: 280,
+    gapX: 72,
+    gapY: 96,
+    centerY: 340,
+    rowSize: 4,
+    cardHeight: 250
   });
 
   // Normalize so min x/y start near 0 for easier fitting.
@@ -2761,16 +2777,19 @@ function renderSchemaCanvas(describe) {
   }
   if (!Number.isFinite(minX)) minX = 0;
   if (!Number.isFinite(minY)) minY = 0;
-  const offsetX = 40 - minX;
-  const offsetY = 40 - minY;
+  const offsetX = 48 - minX;
+  const offsetY = 48 - minY;
+  const saved = state.schemaCardPositions || {};
 
   cardsHost.replaceChildren();
   for (const [name, pos] of positions.entries()) {
     const desc =
       name === describe.name ? describe : state.schemaNeighbors?.[name] || { name, label: name, fields: [] };
     const card = buildSchemaCard(desc, pos.role === "center");
-    card.style.left = `${pos.x + offsetX}px`;
-    card.style.top = `${pos.y + offsetY}px`;
+    const x = Number.isFinite(saved[name]?.x) ? saved[name].x : pos.x + offsetX;
+    const y = Number.isFinite(saved[name]?.y) ? saved[name].y : pos.y + offsetY;
+    card.style.left = `${x}px`;
+    card.style.top = `${y}px`;
     cardsHost.appendChild(card);
   }
 
@@ -2802,11 +2821,12 @@ function buildSchemaCard(describe, isCenter) {
     ? `<div class="sb-crud-strip" title="${escapeHtml(crudTitle)}">${crudStripHtml(access)}</div>`
     : "";
   card.innerHTML = `
-    <div class="sb-card-head" title="Focus ${escapeHtml(describe.name)}">
-      <div>
+    <div class="sb-card-head" title="${isCenter ? "Drag to move" : `Drag to move · click to focus ${escapeHtml(describe.name)}`}">
+      <span class="sb-drag-handle" aria-hidden="true"></span>
+      <div class="sb-card-titles">
         <span class="sb-kind">${escapeHtml(kind)}</span>
         <strong>${escapeHtml(describe.label || describe.name)}</strong>
-        <span class="sb-api">${escapeHtml(describe.name)}</span>
+        <span class="sb-api" title="${escapeHtml(describe.name)}">${escapeHtml(describe.name)}</span>
       </div>
     </div>
     ${crudHtml}
@@ -2831,7 +2851,7 @@ function buildSchemaCard(describe, isCenter) {
                       `<span class="sb-badge sb-badge-${b.kind}" title="${escapeHtml(b.title)}">${escapeHtml(b.key)}</span>`
                   )
                   .join("");
-                return `<div class="sb-field${rel}${req}${denied}" data-field="${escapeHtml(f.name)}" data-object="${escapeHtml(describe.name)}" title="${escapeHtml(badges.reason || f.name)}">
+                return `<div class="sb-field${rel}${req}${denied}" data-field="${escapeHtml(f.name)}" data-object="${escapeHtml(describe.name)}" data-rel-targets="${escapeHtml((f.referenceTo || []).join(","))}" title="${escapeHtml(badges.reason || f.name)}">
                   <span class="sb-field-name">${escapeHtml(f.label || f.name)}</span>
                   <span class="sb-field-meta">
                     <span class="sb-field-badges">${accessHtml}${flagHtml}</span>
@@ -2854,7 +2874,13 @@ function buildSchemaCard(describe, isCenter) {
     }
   `;
 
-  card.querySelector(".sb-card-head")?.addEventListener("click", () => {
+  bindSchemaCardDrag(card, describe.name);
+  card.querySelector(".sb-card-head")?.addEventListener("click", (e) => {
+    if (card.dataset.didDrag === "1") {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (describe.name === state.schemaDescribe?.name) return;
     onLoadSchema({ resetTrail: false, sobject: describe.name }).catch(() => {});
   });
@@ -2866,6 +2892,17 @@ function buildSchemaCard(describe, isCenter) {
     requestAnimationFrame(() => drawSchemaLines());
   });
   card.querySelectorAll(".sb-field[data-field]").forEach((row) => {
+    row.addEventListener("mouseenter", () => {
+      const edge = (state._schemaEdges || []).find(
+        (e) => e.fromObject === describe.name && e.fromField === row.getAttribute("data-field")
+      );
+      if (!edge && !row.classList.contains("is-rel")) return;
+      highlightSchemaRelation(edge || null, {
+        objects: [describe.name, ...(row.getAttribute("data-rel-targets") || "").split(",").filter(Boolean)],
+        fieldEl: row
+      });
+    });
+    row.addEventListener("mouseleave", () => highlightSchemaRelation(null));
     row.addEventListener("click", (e) => {
       e.stopPropagation();
       const fieldName = row.getAttribute("data-field");
@@ -2882,6 +2919,53 @@ function buildSchemaCard(describe, isCenter) {
     });
   });
   return card;
+}
+
+function bindSchemaCardDrag(card, objectName) {
+  const handle = card.querySelector(".sb-card-head");
+  if (!handle) return;
+  let dragging = false;
+  let moved = false;
+  let lastX = 0;
+  let lastY = 0;
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    dragging = true;
+    moved = false;
+    card.dataset.didDrag = "0";
+    lastX = e.clientX;
+    lastY = e.clientY;
+    card.classList.add("is-dragging");
+    handle.setPointerCapture?.(e.pointerId);
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const scale = state.schemaView?.scale || 1;
+    const dx = (e.clientX - lastX) / scale;
+    const dy = (e.clientY - lastY) / scale;
+    if (!moved && Math.hypot(e.clientX - lastX, e.clientY - lastY) < 6) return;
+    moved = true;
+    card.dataset.didDrag = "1";
+    lastX = e.clientX;
+    lastY = e.clientY;
+    const left = (parseFloat(card.style.left) || 0) + dx;
+    const top = (parseFloat(card.style.top) || 0) + dy;
+    card.style.left = `${left}px`;
+    card.style.top = `${top}px`;
+    state.schemaCardPositions = {
+      ...(state.schemaCardPositions || {}),
+      [objectName]: { x: left, y: top }
+    };
+    drawSchemaLines();
+  });
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    card.classList.remove("is-dragging");
+  };
+  handle.addEventListener("pointerup", endDrag);
+  handle.addEventListener("pointercancel", endDrag);
 }
 
 function hideSchemaFieldMenu() {
@@ -2991,21 +3075,25 @@ function openSchemaFieldMenu({ field, objectName, anchorEl, clientX, clientY }) 
   });
 }
 
+function boxForEl(el) {
+  return {
+    x: el.offsetLeft,
+    y: el.offsetTop,
+    w: el.offsetWidth,
+    h: el.offsetHeight
+  };
+}
+
 function drawSchemaLines() {
   const svg = $("#schemaLines");
   const cardsHost = $("#schemaCards");
-  const viewport = $("#schemaViewport");
   if (!svg || !cardsHost) return;
   const edges = state._schemaEdges || [];
-  const world = $("#schemaWorld");
-  // Size SVG to content box
   let maxX = 800;
   let maxY = 600;
   for (const card of cardsHost.querySelectorAll(".sb-card")) {
-    const left = card.offsetLeft + card.offsetWidth;
-    const top = card.offsetTop + card.offsetHeight;
-    maxX = Math.max(maxX, left + 80);
-    maxY = Math.max(maxY, top + 80);
+    maxX = Math.max(maxX, card.offsetLeft + card.offsetWidth + 120);
+    maxY = Math.max(maxY, card.offsetTop + card.offsetHeight + 80);
   }
   svg.setAttribute("width", String(maxX));
   svg.setAttribute("height", String(maxY));
@@ -3023,54 +3111,122 @@ function drawSchemaLines() {
     </marker>
   </defs>`;
 
+  const incoming = {};
+  for (const edge of edges) {
+    incoming[edge.toObject] = (incoming[edge.toObject] || 0) + 1;
+  }
+  const incomingSeen = {};
+
   for (const edge of edges) {
     const fromField = cardsHost.querySelector(
       `.sb-field[data-object="${CSS.escape(edge.fromObject)}"][data-field="${CSS.escape(edge.fromField)}"]`
     );
     const toCard = cardsHost.querySelector(`.sb-card[data-object="${CSS.escape(edge.toObject)}"]`);
-    if (!toCard) continue;
-    const fromEl = fromField || cardsHost.querySelector(`.sb-card[data-object="${CSS.escape(edge.fromObject)}"]`);
-    if (!fromEl) continue;
-
-    const x1 = fromEl.offsetLeft + (fromField ? fromEl.offsetWidth : fromEl.offsetWidth / 2);
-    const y1 = fromEl.offsetTop + fromEl.offsetHeight / 2;
-    const x2 = toCard.offsetLeft + toCard.offsetWidth / 2;
-    const y2 = toCard.offsetTop + 18;
-    const dx = Math.max(40, Math.abs(x2 - x1) * 0.35);
-    const c1x = x1 + (x2 >= x1 ? dx : -dx);
-    const c2x = x2 + (x2 >= x1 ? -dx : dx);
-    const d = `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`;
+    const fromCard = cardsHost.querySelector(`.sb-card[data-object="${CSS.escape(edge.fromObject)}"]`);
+    if (!toCard || !fromCard) continue;
+    const fromEl = fromField || fromCard;
+    incomingSeen[edge.toObject] = (incomingSeen[edge.toObject] || 0) + 1;
+    const route = routeRelationshipPath({
+      fromBox: boxForEl(fromEl),
+      toBox: boxForEl(toCard),
+      index: edge.spreadIndex ?? incomingSeen[edge.toObject] - 1,
+      count: edge.spreadCount || incoming[edge.toObject] || 1
+    });
     const highlighted = state.schemaHighlightedEdgeId === edge.id;
     const baseClass = edge.kind === "masterdetail" ? "sb-line sb-line-md" : "sb-line";
+    const label = edgeLabelText(edge);
+
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    group.setAttribute("class", `sb-edge${highlighted ? " is-highlight" : ""}`);
+    group.dataset.edgeId = edge.id;
+    group.dataset.fromObject = edge.fromObject;
+    group.dataset.toObject = edge.toObject;
+    group.dataset.fromField = edge.fromField;
 
     const hit = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    hit.setAttribute("d", d);
+    hit.setAttribute("d", route.d);
     hit.setAttribute("class", "sb-line-hit");
-    hit.dataset.edgeId = edge.id;
-    hit.setAttribute("title", `${edge.fromObject}.${edge.fromField} → ${edge.toObject}`);
+    hit.setAttribute("title", label);
+    hit.addEventListener("mouseenter", () => highlightSchemaRelation(edge));
+    hit.addEventListener("mouseleave", () => highlightSchemaRelation(null));
     hit.addEventListener("click", (ev) => {
       ev.stopPropagation();
       onSchemaEdgeClick(edge);
     });
-    svg.appendChild(hit);
+    group.appendChild(hit);
 
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", d);
+    path.setAttribute("d", route.d);
     path.setAttribute("class", `${baseClass}${highlighted ? " is-highlight" : ""}`);
     path.setAttribute("marker-end", `url(#${markerId}${edge.kind === "masterdetail" ? "-md" : ""})`);
-    path.dataset.edgeId = edge.id;
-    svg.appendChild(path);
+    group.appendChild(path);
 
-    // Crow's foot-ish tick at child end
     const tick = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    tick.setAttribute("cx", String(x1));
-    tick.setAttribute("cy", String(y1));
+    tick.setAttribute("cx", String(route.x1));
+    tick.setAttribute("cy", String(route.y1));
     tick.setAttribute("r", "3.5");
     tick.setAttribute("class", edge.kind === "masterdetail" ? "sb-line-dot sb-line-md" : "sb-line-dot");
-    svg.appendChild(tick);
+    group.appendChild(tick);
+
+    const textW = Math.min(220, Math.max(72, label.length * 6.2));
+    const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    bg.setAttribute("class", "sb-line-label-bg");
+    bg.setAttribute("x", String(route.labelX - textW / 2));
+    bg.setAttribute("y", String(route.labelY - 11));
+    bg.setAttribute("width", String(textW));
+    bg.setAttribute("height", "18");
+    bg.setAttribute("rx", "4");
+    group.appendChild(bg);
+
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("class", "sb-line-label");
+    text.setAttribute("x", String(route.labelX));
+    text.setAttribute("y", String(route.labelY + 2));
+    text.setAttribute("text-anchor", "middle");
+    text.textContent = label;
+    group.appendChild(text);
+
+    svg.appendChild(group);
   }
-  void viewport;
-  void world;
+
+  if (state.schemaHighlightedEdgeId) {
+    const edge = edges.find((e) => e.id === state.schemaHighlightedEdgeId);
+    if (edge) highlightSchemaRelation(edge);
+  }
+}
+
+function highlightSchemaRelation(edge, extra = {}) {
+  const svg = $("#schemaLines");
+  const cardsHost = $("#schemaCards");
+  const world = $("#schemaWorld");
+  if (!svg || !cardsHost) return;
+  const objects = new Set(extra.objects || []);
+  if (edge) {
+    objects.add(edge.fromObject);
+    objects.add(edge.toObject);
+  }
+  const hovering = objects.size > 0;
+  world?.classList.toggle("is-rel-hover", hovering);
+  for (const card of cardsHost.querySelectorAll(".sb-card")) {
+    const name = card.dataset.object;
+    card.classList.toggle("is-related", hovering && objects.has(name));
+    card.classList.toggle("is-dimmed", hovering && !objects.has(name));
+  }
+  for (const row of cardsHost.querySelectorAll(".sb-field")) {
+    const match = !!(
+      extra.fieldEl === row ||
+      (edge &&
+        row.getAttribute("data-object") === edge.fromObject &&
+        row.getAttribute("data-field") === edge.fromField)
+    );
+    row.classList.toggle("is-rel-active", match);
+  }
+  for (const g of svg.querySelectorAll(".sb-edge")) {
+    const on = !!(edge && g.dataset.edgeId === edge.id);
+    g.classList.toggle("is-highlight", on);
+    g.classList.toggle("is-dimmed", hovering && !on);
+    g.querySelector(".sb-line")?.classList.toggle("is-highlight", on);
+  }
 }
 
 function onSchemaEdgeClick(edge) {

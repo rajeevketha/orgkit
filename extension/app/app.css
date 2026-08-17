@@ -1190,25 +1190,46 @@ button.linkish:hover,
   pointer-events: none;
 }
 .sb-line-md { stroke: #e07a5f; }
-.sb-line.is-highlight {
+.sb-line.is-highlight,
+.sb-edge.is-highlight .sb-line {
   stroke-width: 3.25;
   opacity: 1;
   stroke: #7ec8ff;
 }
-.sb-line-md.is-highlight { stroke: #ff9b7a; }
+.sb-line-md.is-highlight,
+.sb-edge.is-highlight .sb-line-md { stroke: #ff9b7a; }
+.sb-edge.is-dimmed { opacity: 0.18; }
 .sb-line-hit {
   fill: none;
   stroke: transparent;
-  stroke-width: 14;
+  stroke-width: 16;
   pointer-events: stroke;
   cursor: pointer;
 }
 .sb-line-dot { fill: #5b9bd5; pointer-events: none; }
 .sb-line-dot.sb-line-md { fill: #e07a5f; }
+.sb-line-label {
+  fill: #d7e8ff;
+  font-size: 10.5px;
+  font-family: var(--font, inherit);
+  pointer-events: none;
+}
+.sb-line-label-bg {
+  fill: #102238;
+  stroke: #3d5f82;
+  stroke-width: 1;
+  pointer-events: none;
+}
+.sb-edge.is-highlight .sb-line-label-bg {
+  fill: #173049;
+  stroke: #7ec8ff;
+}
 
 .sb-card {
   position: absolute;
-  width: 268px;
+  width: 280px;
+  min-width: 280px;
+  box-sizing: border-box;
   border: 1px solid #3d5f82;
   border-radius: 8px;
   background: #152a41;
@@ -1219,15 +1240,42 @@ button.linkish:hover,
   border-color: rgba(1, 118, 211, 0.75);
   box-shadow: 0 0 0 1px rgba(1, 118, 211, 0.35), 0 10px 28px rgba(0, 0, 0, 0.35);
 }
+.sb-card.is-related {
+  border-color: #7ec8ff;
+  box-shadow: 0 0 0 2px rgba(126, 200, 255, 0.45), 0 10px 28px rgba(0, 0, 0, 0.35);
+  z-index: 4;
+}
+.sb-card.is-dimmed { opacity: 0.42; }
+.sb-card.is-dragging {
+  z-index: 6;
+  cursor: grabbing;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45);
+}
 .sb-card-head {
   display: flex;
-  justify-content: space-between;
+  align-items: flex-start;
   gap: 8px;
   padding: 8px 10px;
   background: linear-gradient(180deg, #1e3a5a, #173049);
   border-bottom: 1px solid #2f5072;
-  cursor: pointer;
+  cursor: grab;
 }
+.sb-card-head:active { cursor: grabbing; }
+.sb-drag-handle {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 18px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      #7ea7cc 0 2px,
+      transparent 2px 4px
+    );
+  opacity: 0.7;
+}
+.sb-card-titles { min-width: 0; flex: 1; }
 .sb-card.kind-custom .sb-card-head {
   background: linear-gradient(180deg, #3a2e1c, #2a2216);
   border-bottom-color: #6a5230;
@@ -1250,27 +1298,36 @@ button.linkish:hover,
   display: block;
   font-size: 13px;
   color: var(--ink);
-  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sb-api {
   display: block;
   font-size: 11px;
   color: var(--muted);
   font-family: var(--mono);
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sb-fields { max-height: 260px; overflow: auto; }
 .sb-field {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(88px, 1fr) auto;
   gap: 8px;
-  align-items: baseline;
+  align-items: center;
   padding: 5px 10px;
   border-bottom: 1px solid rgba(42, 74, 107, 0.45);
   font-size: 11.5px;
   cursor: pointer;
+  min-width: 0;
 }
 .sb-field:hover { background: rgba(1, 118, 211, 0.12); }
+.sb-field.is-rel-active {
+  background: rgba(126, 200, 255, 0.16);
+  box-shadow: inset 2px 0 0 #7ec8ff;
+}
 .sb-card.has-as-user .sb-crud-strip {
   outline: 1px solid rgba(126, 200, 255, 0.35);
 }
@@ -1286,7 +1343,14 @@ button.linkish:hover,
   vertical-align: -1px;
 }
 .sb-field.is-rel .sb-field-name { color: #9ec9ff; }
-.sb-field-name { color: var(--text); word-break: break-word; }
+.sb-field-name {
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
+}
 .sb-field-type {
   color: var(--muted);
   font-size: 10.5px;
@@ -1432,7 +1496,8 @@ html.shell-wide .schema-viewport { height: min(68vh, 640px); }
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
-  min-width: 0;
+  flex: 0 0 auto;
+  max-width: 46%;
 }
 .sb-field-badges { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; }
 .sb-badge {

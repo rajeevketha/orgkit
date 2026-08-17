@@ -15,6 +15,9 @@ import {
   pickCardFields,
   layoutSchemaGraph,
   buildGraphEdges,
+  assignEdgeSpread,
+  routeRelationshipPath,
+  edgeLabelText,
   sessionObjectAccess,
   fieldSchemaBadges,
   summarizeSessionPermissions,
@@ -184,15 +187,58 @@ test("layoutSchemaGraph places parents above and children below", () => {
   assert.equal(pos.get("Account").role, "center");
 });
 
+test("layoutSchemaGraph wraps extra children onto a second row", () => {
+  const pos = layoutSchemaGraph({
+    centerName: "Account",
+    parentNames: [],
+    childNames: ["Contact", "Case", "Opportunity", "Task", "Note"],
+    cardWidth: 200,
+    gapX: 20,
+    gapY: 40,
+    rowSize: 4,
+    cardHeight: 100
+  });
+  assert.equal(pos.get("Contact").y, pos.get("Case").y);
+  assert.ok(pos.get("Note").y > pos.get("Contact").y);
+  assert.equal(pos.get("Note").role, "child");
+});
+
 test("buildGraphEdges links lookups both ways", () => {
   const edges = buildGraphEdges({
     centerName: "Account",
-    parents: [{ fieldName: "OwnerId", targetObject: "User", type: "reference" }],
-    children: [{ childObject: "Contact", fieldName: "AccountId", cascadeDelete: false }]
+    parents: [{ fieldName: "OwnerId", targetObject: "User", type: "reference", relationshipName: "Owner" }],
+    children: [{ childObject: "Contact", fieldName: "AccountId", cascadeDelete: false, relationshipName: "Contacts" }]
   });
   assert.equal(edges.length, 2);
   assert.equal(edges[0].fromObject, "Account");
+  assert.equal(edges[0].label, "Owner → User");
   assert.equal(edges[1].toObject, "Account");
+  assert.equal(edges[1].spreadCount, 1);
+});
+
+test("assignEdgeSpread and routeRelationshipPath fan stacked links", () => {
+  const spread = assignEdgeSpread([
+    { id: "a", fromObject: "Job__c", toObject: "Account", fromField: "A__c" },
+    { id: "b", fromObject: "Job__c", toObject: "Account", fromField: "B__c" }
+  ]);
+  assert.equal(spread[0].spreadIndex, 0);
+  assert.equal(spread[1].spreadIndex, 1);
+  assert.equal(spread[1].spreadCount, 2);
+  const a = routeRelationshipPath({
+    fromBox: { x: 0, y: 40, w: 100, h: 20 },
+    toBox: { x: 200, y: 0, w: 100, h: 80 },
+    index: 0,
+    count: 2
+  });
+  const b = routeRelationshipPath({
+    fromBox: { x: 0, y: 60, w: 100, h: 20 },
+    toBox: { x: 200, y: 0, w: 100, h: 80 },
+    index: 1,
+    count: 2
+  });
+  assert.notEqual(a.x2, b.x2);
+  assert.match(a.d, /^M /);
+  assert.equal(edgeLabelText({ label: "Owner → User" }), "Owner → User");
 });
 
 test("session CRUD and field badges from describe", () => {

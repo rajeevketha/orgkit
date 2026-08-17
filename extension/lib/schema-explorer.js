@@ -263,41 +263,51 @@ export function pickCardFields(describe, { max = 10, expanded = false } = {}) {
 
 /**
  * Auto-layout: center object, parents above, children below (Salesforce Schema Builder–like).
+ * Children wrap into rows so cards do not pile into one overlapping strip.
  * @returns {Map<string, { x: number, y: number, role: string }>}
  */
 export function layoutSchemaGraph({
   centerName,
   parentNames = [],
   childNames = [],
-  cardWidth = 260,
-  gapX = 36,
-  gapY = 72,
-  centerY = 320
+  cardWidth = 280,
+  gapX = 64,
+  gapY = 88,
+  centerY = 340,
+  rowSize = 4,
+  cardHeight = 250
 } = {}) {
   /** @type {Map<string, { x: number, y: number, role: string }>} */
   const positions = new Map();
   const parents = [...new Set(parentNames.filter(Boolean))];
   const children = [...new Set(childNames.filter(Boolean).filter((n) => n !== centerName))];
 
-  const placeRow = (names, y, role) => {
-    const n = names.length;
-    if (!n) return;
-    const totalW = n * cardWidth + (n - 1) * gapX;
-    let x = -totalW / 2;
-    for (const name of names) {
+  const placeWrapped = (names, startY, role) => {
+    if (!names.length) return startY;
+    const cols = Math.min(Math.max(1, rowSize), names.length);
+    names.forEach((name, i) => {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const countInRow = Math.min(cols, names.length - row * cols);
+      const totalW = countInRow * cardWidth + (countInRow - 1) * gapX;
+      const x = -totalW / 2 + col * (cardWidth + gapX);
+      const y = startY + row * (cardHeight + gapY);
       positions.set(name, { x, y, role });
-      x += cardWidth + gapX;
-    }
+    });
+    const rows = Math.ceil(names.length / cols);
+    return startY + rows * (cardHeight + gapY);
   };
 
-  placeRow(parents, 24, "parent");
+  placeWrapped(parents, 24, "parent");
+  const parentRows = parents.length ? Math.ceil(parents.length / Math.min(rowSize, parents.length)) : 0;
+  const centerTop = parents.length ? 24 + parentRows * (cardHeight + gapY) : 24;
   positions.set(centerName, {
     x: -cardWidth / 2,
-    y: parents.length ? centerY : 24,
+    y: centerTop,
     role: "center"
   });
-  const childY = (positions.get(centerName)?.y || centerY) + 280 + gapY;
-  placeRow(children, childY, "child");
+  const childY = centerTop + cardHeight + gapY;
+  placeWrapped(children, childY, "child");
   return positions;
 }
 
@@ -305,29 +315,87 @@ export function layoutSchemaGraph({
  * Edges for SVG connectors (child lookup field → parent object).
  */
 export function buildGraphEdges({ centerName, parents = [], children = [] } = {}) {
-  /** @type {Array<{ id: string, fromObject: string, fromField: string, toObject: string, kind: string }>} */
+  /** @type {Array<{ id: string, fromObject: string, fromField: string, toObject: string, kind: string, relationshipName: string|null, label: string }>} */
   const edges = [];
   for (const p of parents) {
     if (!p?.targetObject || !p?.fieldName) continue;
+    const relationshipName = p.relationshipName || p.fieldName;
     edges.push({
       id: `${centerName}.${p.fieldName}->${p.targetObject}`,
       fromObject: centerName,
       fromField: p.fieldName,
       toObject: p.targetObject,
-      kind: String(p.type || "").toLowerCase() === "masterdetail" ? "masterdetail" : "lookup"
+      kind: String(p.type || "").toLowerCase() === "masterdetail" ? "masterdetail" : "lookup",
+      relationshipName,
+      label: `${relationshipName} → ${p.targetObject}`
     });
   }
   for (const c of children) {
     if (!c?.childObject || !c?.fieldName) continue;
+    const relationshipName = c.relationshipName || c.fieldName;
     edges.push({
       id: `${c.childObject}.${c.fieldName}->${centerName}`,
       fromObject: c.childObject,
       fromField: c.fieldName,
       toObject: centerName,
-      kind: c.cascadeDelete ? "masterdetail" : "lookup"
+      kind: c.cascadeDelete ? "masterdetail" : "lookup",
+      relationshipName,
+      label: `${c.childObject}.${relationshipName} → ${centerName}`
     });
   }
-  return edges;
+  return assignEdgeSpread(edges);
+}
+
+/** Spread stacked edges that share the same from/to objects so lines do not form one cord. */
+export function assignEdgeSpread(edges = []) {
+  const groups = new Map();
+  for (const e of edges) {
+    const key = `${e.fromObject}|${e.toObject}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
+  }
+  return edges.map((e) => {
+    const g = groups.get(`${e.fromObject}|${e.toObject}`) || [e];
+    return { ...e, spreadIndex: g.indexOf(e), spreadCount: g.length };
+  });
+}
+
+/**
+ * Orthogonal-ish cubic path from a source field/card box to a related card.
+ * @param {{ x: number, y: number, w: number, h: number }} fromBox
+ * @param {{ x: number, y: number, w: number, h: number }} toBox
+ */
+export function routeRelationshipPath({ fromBox, toBox, index = 0, count = 1 } = {}) {
+  const from = fromBox || { x: 0, y: 0, w: 0, h: 0 };
+  const to = toBox || { x: 0, y: 0, w: 0, h: 0 };
+  const spread = Math.max(0, count - 1) * 18;
+  const offset = count > 1 ? -spread / 2 + index * 18 : 0;
+  const x1 = from.x + from.w;
+  const y1 = from.y + from.h / 2;
+  const toMid = to.x + to.w / 2 + offset;
+  const x2 = Math.max(to.x + 18, Math.min(to.x + to.w - 18, toMid));
+  const fromCenterY = from.y + from.h / 2;
+  const toCenterY = to.y + to.h / 2;
+  const goingUp = fromCenterY > toCenterY;
+  const y2 = goingUp ? to.y + to.h - 6 : to.y + 12;
+  const midY = (y1 + y2) / 2 + offset * 0.35;
+  const out = 56 + Math.abs(offset);
+  const d = `M ${x1} ${y1} C ${x1 + out} ${y1}, ${x2} ${midY}, ${x2} ${y2}`;
+  return {
+    d,
+    x1,
+    y1,
+    x2,
+    y2,
+    labelX: (x1 + x2) / 2,
+    labelY: midY - 8
+  };
+}
+
+export function edgeLabelText(edge, { max = 42 } = {}) {
+  const raw = edge?.label || `${edge?.fromField || ""} → ${edge?.toObject || ""}`;
+  if (raw.length <= max) return raw;
+  return `${raw.slice(0, max - 1)}…`;
 }
 
 /**
