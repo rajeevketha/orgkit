@@ -314,33 +314,46 @@ export function layoutSchemaGraph({
 /**
  * Edges for SVG connectors (child lookup field → parent object).
  */
-export function buildGraphEdges({ centerName, parents = [], children = [] } = {}) {
-  /** @type {Array<{ id: string, fromObject: string, fromField: string, toObject: string, kind: string, relationshipName: string|null, label: string }>} */
+export function buildGraphEdges({ centerName, parents = [], children = [], labels = {} } = {}) {
   const edges = [];
+  const nameOf = (api) => labels[api] || api;
   for (const p of parents) {
     if (!p?.targetObject || !p?.fieldName) continue;
     const relationshipName = p.relationshipName || p.fieldName;
+    const techLabel = `${relationshipName} → ${p.targetObject}`;
+    const kind = String(p.type || "").toLowerCase() === "masterdetail" ? "masterdetail" : "lookup";
     edges.push({
       id: `${centerName}.${p.fieldName}->${p.targetObject}`,
       fromObject: centerName,
       fromField: p.fieldName,
       toObject: p.targetObject,
-      kind: String(p.type || "").toLowerCase() === "masterdetail" ? "masterdetail" : "lookup",
+      kind,
       relationshipName,
-      label: `${relationshipName} → ${p.targetObject}`
+      techLabel,
+      plainLabel: `belongs to ${nameOf(p.targetObject)}`,
+      label: techLabel,
+      sentence: `${nameOf(centerName)} is linked to ${nameOf(p.targetObject)}.`
     });
   }
   for (const c of children) {
     if (!c?.childObject || !c?.fieldName) continue;
     const relationshipName = c.relationshipName || c.fieldName;
+    const techLabel = `${c.childObject}.${relationshipName} → ${centerName}`;
+    const kind = c.cascadeDelete ? "masterdetail" : "lookup";
     edges.push({
       id: `${c.childObject}.${c.fieldName}->${centerName}`,
       fromObject: c.childObject,
       fromField: c.fieldName,
       toObject: centerName,
-      kind: c.cascadeDelete ? "masterdetail" : "lookup",
+      kind,
       relationshipName,
-      label: `${c.childObject}.${relationshipName} → ${centerName}`
+      techLabel,
+      plainLabel: `${nameOf(c.childObject)} belongs here`,
+      label: techLabel,
+      sentence:
+        kind === "masterdetail"
+          ? `${nameOf(c.childObject)} must belong to ${nameOf(centerName)}.`
+          : `${nameOf(c.childObject)} records can belong to this ${nameOf(centerName)}.`
     });
   }
   return assignEdgeSpread(edges);
@@ -392,10 +405,73 @@ export function routeRelationshipPath({ fromBox, toBox, index = 0, count = 1 } =
   };
 }
 
-export function edgeLabelText(edge, { max = 42 } = {}) {
-  const raw = edge?.label || `${edge?.fromField || ""} → ${edge?.toObject || ""}`;
+export function edgeLabelText(edge, { max = 42, simple = false } = {}) {
+  const raw = simple
+    ? edge?.plainLabel || edge?.label || ""
+    : edge?.techLabel || edge?.label || `${edge?.fromField || ""} → ${edge?.toObject || ""}`;
   if (raw.length <= max) return raw;
   return `${raw.slice(0, max - 1)}…`;
+}
+
+export function friendlyObjectKind(kind) {
+  const k = String(kind || "");
+  if (k.includes("Metadata")) return "Custom metadata";
+  if (k === "Custom") return "Custom object";
+  if (k.includes("Event")) return "Event";
+  if (k.includes("External") || k.includes("Big")) return "Special object";
+  return "Standard object";
+}
+
+export function friendlyRoleLabel(role) {
+  if (role === "parent") return "Linked to";
+  if (role === "child") return "Belongs here";
+  return "This record";
+}
+
+export function joinLabels(items = []) {
+  const a = items.filter(Boolean);
+  if (!a.length) return "";
+  if (a.length === 1) return a[0];
+  if (a.length === 2) return `${a[0]} and ${a[1]}`;
+  return `${a.slice(0, -1).join(", ")}, and ${a[a.length - 1]}`;
+}
+
+export function schemaStory({ centerLabel, parentLabels = [], childLabels = [] } = {}) {
+  let s = `You're looking at ${centerLabel || "this record"}.`;
+  if (parentLabels.length) s += ` It is linked to ${joinLabels(parentLabels.slice(0, 5))}.`;
+  if (childLabels.length) s += ` These records belong to it: ${joinLabels(childLabels.slice(0, 6))}.`;
+  return s;
+}
+
+export function plainRelationshipSentence(edge, labels = {}) {
+  if (edge?.sentence) return edge.sentence;
+  const from = labels[edge?.fromObject] || edge?.fromObject || "This";
+  const to = labels[edge?.toObject] || edge?.toObject || "another record";
+  if (edge?.kind === "masterdetail") {
+    return `${from} must belong to ${to} — it cannot exist without that parent.`;
+  }
+  return `${from} can be linked to ${to}.`;
+}
+
+export function friendlyFieldHint(field, labels = {}) {
+  const name = field?.label || field?.name || "This field";
+  if (field?.referenceTo?.length) {
+    const targets = field.referenceTo.map((n) => labels[n] || n).join(" or ");
+    return `${name} links to ${targets}.`;
+  }
+  if (field?.type === "id") return `${name} is the unique ID for this record.`;
+  return name;
+}
+
+export function friendlyAccessLine(access) {
+  const bits = [];
+  if (access?.read) bits.push("view");
+  if (access?.create) bits.push("create");
+  if (access?.edit) bits.push("edit");
+  if (access?.del) bits.push("delete");
+  if (!bits.length) return "You cannot work with these records in this session.";
+  if (bits.length === 1) return `You can ${bits[0]} these records.`;
+  return `You can ${bits.slice(0, -1).join(", ")} and ${bits[bits.length - 1]} these records.`;
 }
 
 /**

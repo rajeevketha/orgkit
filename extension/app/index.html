@@ -265,8 +265,8 @@
   <!-- FEATURE: Schema Explorer -->
   <section id="view-schema" class="view">
     <p class="lede">
-      Salesforce-style Schema Builder — object cards, relationship lines, session CRUD/FLS, and optional <strong>as-user</strong> overlays.
-      Supports standard objects, custom (<code>__c</code>), and custom metadata (<code>__mdt</code>).
+      A map of your Salesforce records — each tile is one type of record, and lines show how they connect.
+      Drag any tile to move just that tile. Switch to <strong>Technical</strong> for API names and SOQL.
     </p>
     <div class="schema-filter-row" role="group" aria-label="Object type filter">
       <button type="button" class="schema-filter active" data-schema-filter="all">All</button>
@@ -281,7 +281,7 @@
           id="schemaObjectSearch"
           class="input grow"
           list="schemaObjectList"
-          placeholder="Search any object — Account, MyObj__c, Setting__mdt…"
+          placeholder="Search a record type — Account, Contact, custom objects…"
           autocomplete="off"
           style="width:100%"
         />
@@ -295,14 +295,22 @@
     <div id="schemaSummary" class="hint"></div>
     <div id="schemaBuilder" class="schema-builder hidden" aria-live="polite">
       <div class="schema-builder-toolbar">
-        <span class="hint" style="margin:0">Drag a card to move it · drag canvas to pan · hover a line to see the related objects</span>
+        <span class="hint" style="margin:0" id="schemaCanvasHint">Drag a tile to move it · empty space pans the map</span>
         <div class="row wrap" style="margin:0;gap:6px">
+          <button type="button" class="btn ghost active" id="schemaToggleSimple" title="Simple or technical labels">Simple</button>
           <button type="button" class="btn ghost" id="schemaTogglePerms" title="Permissions drawer (session / as-user)">Permissions</button>
           <button type="button" class="btn ghost" id="schemaResetLayout" title="Reset card positions">Reset layout</button>
           <button type="button" class="btn ghost" id="schemaZoomOut" title="Zoom out">−</button>
           <button type="button" class="btn ghost" id="schemaZoomReset" title="Fit canvas">Fit</button>
           <button type="button" class="btn ghost" id="schemaZoomIn" title="Zoom in">+</button>
         </div>
+      </div>
+      <p class="schema-story" id="schemaRelationStory"></p>
+      <div class="schema-legend" id="schemaLegend">
+        <span class="schema-legend-item"><i class="lg-lookup"></i> Linked to</span>
+        <span class="schema-legend-item"><i class="lg-md"></i> Must belong to (required parent)</span>
+        <span class="schema-legend-item">Hover a line or field to highlight the connection</span>
+      </div>
       </div>
       <div class="schema-builder-body">
         <div class="schema-viewport" id="schemaViewport">

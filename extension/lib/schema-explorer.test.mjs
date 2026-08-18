@@ -18,6 +18,8 @@ import {
   assignEdgeSpread,
   routeRelationshipPath,
   edgeLabelText,
+  schemaStory,
+  friendlyAccessLine,
   sessionObjectAccess,
   fieldSchemaBadges,
   summarizeSessionPermissions,
@@ -213,7 +215,21 @@ test("buildGraphEdges links lookups both ways", () => {
   assert.equal(edges[0].fromObject, "Account");
   assert.equal(edges[0].label, "Owner → User");
   assert.equal(edges[1].toObject, "Account");
-  assert.equal(edges[1].spreadCount, 1);
+  assert.equal(edges[0].plainLabel, "belongs to User");
+  assert.match(edges[1].sentence, /Contact/);
+});
+
+test("schemaStory and friendly access use plain language", () => {
+  assert.match(
+    schemaStory({
+      centerLabel: "Account",
+      parentLabels: ["User"],
+      childLabels: ["Contact", "Opportunity"]
+    }),
+    /You're looking at Account/
+  );
+  assert.equal(friendlyAccessLine({ read: true, create: true, edit: true, del: false }), "You can view, create and edit these records.");
+  assert.equal(edgeLabelText({ plainLabel: "belongs to User", techLabel: "Owner → User" }, { simple: true }), "belongs to User");
 });
 
 test("assignEdgeSpread and routeRelationshipPath fan stacked links", () => {

@@ -41,6 +41,12 @@ import {
   buildGraphEdges,
   routeRelationshipPath,
   edgeLabelText,
+  friendlyObjectKind,
+  friendlyRoleLabel,
+  schemaStory,
+  plainRelationshipSentence,
+  friendlyFieldHint,
+  friendlyAccessLine,
   sessionObjectAccess,
   fieldSchemaBadges,
   summarizeSessionPermissions,
@@ -119,7 +125,7 @@ const FEATURES = [
   {
     id: "schema",
     title: "Schema Explorer",
-    blurb: "Schema Builder — cards, lines, session & as-user permissions"
+    blurb: "See how records connect — drag tiles, read relationships in plain language"
   },
   { id: "soql-run", title: "SOQL Runner", blurb: "Query standard & custom objects" },
   { id: "anon-apex", title: "Anonymous Apex", blurb: "Run Apex and view debug output" },
@@ -218,6 +224,9 @@ const state = {
   schemaAsUserOverlays: {},
   schemaHighlightedEdgeId: "",
   schemaCardPositions: {},
+  schemaMovingCard: "",
+  schemaSimpleMode: true,
+  schemaLabels: {},
   schemaFieldMenu: null,
   packageSelections: [],
   packageMembersCache: [],
@@ -2329,6 +2338,11 @@ function bindSchemaCanvasControls() {
       fitSchemaView();
     });
   });
+  $("#schemaToggleSimple")?.addEventListener("click", () => {
+    state.schemaSimpleMode = !state.schemaSimpleMode;
+    renderSchemaExplorer();
+    requestAnimationFrame(() => drawSchemaLines());
+  });
   $("#schemaTogglePerms")?.addEventListener("click", () => {
     state.schemaPermDrawerOpen = !state.schemaPermDrawerOpen;
     applySchemaPermDrawer();
@@ -2357,7 +2371,8 @@ function bindSchemaCanvasControls() {
   let lastX = 0;
   let lastY = 0;
   viewport.addEventListener("pointerdown", (e) => {
-    if (e.target.closest?.(".sb-card") || e.target.closest?.("button")) return;
+    if (state.schemaMovingCard) return;
+    if (e.target.closest?.(".sb-card") || e.target.closest?.("button") || e.target.closest?.(".sb-line-hit")) return;
     dragging = true;
     lastX = e.clientX;
     lastY = e.clientY;
@@ -2365,7 +2380,7 @@ function bindSchemaCanvasControls() {
     viewport.classList.add("is-panning");
   });
   viewport.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
+    if (!dragging || state.schemaMovingCard) return;
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
     lastX = e.clientX;
@@ -2616,11 +2631,54 @@ function onClearSchemaAsUser() {
 function renderSchemaExplorer() {
   const describe = state.schemaDescribe;
   if (!describe) return;
+  const simple = state.schemaSimpleMode !== false;
+  $("#schemaBuilder")?.classList.toggle("is-simple", simple);
+  $("#schemaToggleSimple")?.classList.toggle("active", simple);
+  const simpleBtn = $("#schemaToggleSimple");
+  if (simpleBtn) simpleBtn.textContent = simple ? "Simple" : "Technical";
+  const hint = $("#schemaCanvasHint");
+  if (hint) {
+    hint.textContent = simple
+      ? "Drag any tile to move just that tile · empty space pans the map"
+      : "Drag a tile to move it · empty space pans · click a line for SOQL";
+  }
   renderSchemaBreadcrumb();
   renderSchemaCanvas(describe);
+  renderSchemaStory(describe);
   renderSchemaActions(describe);
   renderSchemaPermDrawer(describe);
   applySchemaPermDrawer();
+}
+
+function schemaLabelMap(describe) {
+  const labels = { [describe.name]: describe.label || describe.name };
+  for (const [name, desc] of Object.entries(state.schemaNeighbors || {})) {
+    labels[name] = desc?.label || name;
+  }
+  return labels;
+}
+
+function renderSchemaStory(describe, edge = null) {
+  const el = $("#schemaRelationStory");
+  if (!el || !describe) return;
+  const labels = state.schemaLabels || schemaLabelMap(describe);
+  if (edge) {
+    el.textContent = plainRelationshipSentence(edge, labels);
+    el.classList.add("is-focus");
+    return;
+  }
+  el.classList.remove("is-focus");
+  el.textContent = schemaStory({
+    centerLabel: describe.label || describe.name,
+    parentLabels: (state.schemaParents || [])
+      .map((p) => labels[p.targetObject] || p.targetObject)
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .slice(0, 5),
+    childLabels: (state.schemaChildren || [])
+      .map((c) => labels[c.childObject] || c.childObject)
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .slice(0, 6)
+  });
 }
 
 function applySchemaPermDrawer() {
@@ -2785,7 +2843,7 @@ function renderSchemaCanvas(describe) {
   for (const [name, pos] of positions.entries()) {
     const desc =
       name === describe.name ? describe : state.schemaNeighbors?.[name] || { name, label: name, fields: [] };
-    const card = buildSchemaCard(desc, pos.role === "center");
+    const card = buildSchemaCard(desc, pos.role === "center", pos.role);
     const x = Number.isFinite(saved[name]?.x) ? saved[name].x : pos.x + offsetX;
     const y = Number.isFinite(saved[name]?.y) ? saved[name].y : pos.y + offsetY;
     card.style.left = `${x}px`;
@@ -2793,40 +2851,53 @@ function renderSchemaCanvas(describe) {
     cardsHost.appendChild(card);
   }
 
+  const labels = schemaLabelMap(describe);
+  state.schemaLabels = labels;
   state._schemaEdges = buildGraphEdges({
     centerName: describe.name,
     parents: (state.schemaParents || []).filter((p) => parentNames.includes(p.targetObject)),
-    children: (state.schemaChildren || []).filter((c) => childNames.includes(c.childObject))
+    children: (state.schemaChildren || []).filter((c) => childNames.includes(c.childObject)),
+    labels
   });
   state._schemaLayoutOffset = { x: offsetX, y: offsetY };
 }
 
-function buildSchemaCard(describe, isCenter) {
+function buildSchemaCard(describe, isCenter, role = "center") {
   const kind = objectKind(describe.name, !!describe.custom);
   const expanded = !!state.schemaExpanded?.[describe.name];
+  const simple = state.schemaSimpleMode !== false;
   const fields = pickCardFields(describe, { max: isCenter ? 12 : 8, expanded });
   const total = describe.fields?.length || 0;
   const overlay = isCenter ? currentSchemaOverlay(describe.name) : null;
   const access = overlay?.mode === "user" ? overlay.objectAccess : sessionObjectAccess(describe);
+  const labels = state.schemaLabels || {};
   const card = document.createElement("div");
   card.className = `sb-card ${objectKindClass(kind)}${isCenter ? " is-center" : ""}${
     overlay?.mode === "user" ? " has-as-user" : ""
   }`;
   card.dataset.object = describe.name;
+  card.dataset.role = role;
   const crudTitle =
     overlay?.mode === "user"
-      ? `CRUD for ${overlay.userLabel}`
-      : "Session CRUD for this object";
+      ? `Access for ${overlay.userLabel}`
+      : "What you can do with this record type";
   const crudHtml = isCenter
-    ? `<div class="sb-crud-strip" title="${escapeHtml(crudTitle)}">${crudStripHtml(access)}</div>`
+    ? simple
+      ? `<div class="sb-access-line" title="${escapeHtml(crudTitle)}">${escapeHtml(friendlyAccessLine(access))}</div>`
+      : `<div class="sb-crud-strip" title="${escapeHtml(crudTitle)}">${crudStripHtml(access)}</div>`
     : "";
   card.innerHTML = `
-    <div class="sb-card-head" title="${isCenter ? "Drag to move" : `Drag to move · click to focus ${escapeHtml(describe.name)}`}">
-      <span class="sb-drag-handle" aria-hidden="true"></span>
+    <div class="sb-card-head">
+      <span class="sb-drag-handle" title="Drag to move this tile" aria-hidden="true"></span>
       <div class="sb-card-titles">
-        <span class="sb-kind">${escapeHtml(kind)}</span>
+        <span class="sb-role-pill">${escapeHtml(friendlyRoleLabel(role))}</span>
         <strong>${escapeHtml(describe.label || describe.name)}</strong>
-        <span class="sb-api" title="${escapeHtml(describe.name)}">${escapeHtml(describe.name)}</span>
+        <span class="sb-kind">${escapeHtml(simple ? friendlyObjectKind(kind) : kind)}</span>
+        ${
+          simple
+            ? ""
+            : `<span class="sb-api" title="${escapeHtml(describe.name)}">${escapeHtml(describe.name)}</span>`
+        }
       </div>
     </div>
     ${crudHtml}
@@ -2839,28 +2910,38 @@ function buildSchemaCard(describe, isCenter) {
                 const rel = f.referenceTo?.length ? " is-rel" : "";
                 const req = !f.nillable && f.createable ? " is-required" : "";
                 const denied = !badges.readable ? " is-denied" : "";
-                const accessHtml = badges.access
-                  .map(
-                    (b) =>
-                      `<span class="sb-badge sb-badge-${b.kind}" title="${escapeHtml(b.title)}">${escapeHtml(b.key)}</span>`
-                  )
-                  .join("");
-                const flagHtml = badges.flags
-                  .map(
-                    (b) =>
-                      `<span class="sb-badge sb-badge-${b.kind}" title="${escapeHtml(b.title)}">${escapeHtml(b.key)}</span>`
-                  )
-                  .join("");
-                return `<div class="sb-field${rel}${req}${denied}" data-field="${escapeHtml(f.name)}" data-object="${escapeHtml(describe.name)}" data-rel-targets="${escapeHtml((f.referenceTo || []).join(","))}" title="${escapeHtml(badges.reason || f.name)}">
+                const relHint = f.referenceTo?.length
+                  ? `links to ${f.referenceTo.map((n) => labels[n] || n).join(" or ")}`
+                  : "";
+                const accessHtml = simple
+                  ? ""
+                  : badges.access
+                      .map(
+                        (b) =>
+                          `<span class="sb-badge sb-badge-${b.kind}" title="${escapeHtml(b.title)}">${escapeHtml(b.key)}</span>`
+                      )
+                      .join("");
+                const flagHtml = simple
+                  ? relHint
+                    ? `<span class="sb-rel-hint">${escapeHtml(relHint)}</span>`
+                    : ""
+                  : badges.flags
+                      .map(
+                        (b) =>
+                          `<span class="sb-badge sb-badge-${b.kind}" title="${escapeHtml(b.title)}">${escapeHtml(b.key)}</span>`
+                      )
+                      .join("");
+                const typeHtml = simple ? "" : `<span class="sb-field-type">${escapeHtml(formatFieldType(f))}</span>`;
+                return `<div class="sb-field${rel}${req}${denied}" data-field="${escapeHtml(f.name)}" data-object="${escapeHtml(describe.name)}" data-rel-targets="${escapeHtml((f.referenceTo || []).join(","))}" title="${escapeHtml(simple ? friendlyFieldHint(f, labels) : badges.reason || f.name)}">
                   <span class="sb-field-name">${escapeHtml(f.label || f.name)}</span>
                   <span class="sb-field-meta">
                     <span class="sb-field-badges">${accessHtml}${flagHtml}</span>
-                    <span class="sb-field-type">${escapeHtml(formatFieldType(f))}</span>
+                    ${typeHtml}
                   </span>
                 </div>`;
               })
               .join("")
-          : `<div class="sb-field muted"><span class="sb-field-name">${describe.stub ? "Describe unavailable" : "No fields"}</span></div>`
+          : `<div class="sb-field muted"><span class="sb-field-name">${describe.stub ? "Details unavailable" : "No fields"}</span></div>`
       }
     </div>
     ${
@@ -2874,16 +2955,7 @@ function buildSchemaCard(describe, isCenter) {
     }
   `;
 
-  bindSchemaCardDrag(card, describe.name);
-  card.querySelector(".sb-card-head")?.addEventListener("click", (e) => {
-    if (card.dataset.didDrag === "1") {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-    if (describe.name === state.schemaDescribe?.name) return;
-    onLoadSchema({ resetTrail: false, sobject: describe.name }).catch(() => {});
-  });
+  bindSchemaCardDrag(card, describe, isCenter);
   card.querySelector("[data-expand]")?.addEventListener("click", (e) => {
     e.stopPropagation();
     const name = e.currentTarget.getAttribute("data-expand");
@@ -2891,62 +2963,38 @@ function buildSchemaCard(describe, isCenter) {
     renderSchemaExplorer();
     requestAnimationFrame(() => drawSchemaLines());
   });
-  card.querySelectorAll(".sb-field[data-field]").forEach((row) => {
-    row.addEventListener("mouseenter", () => {
-      const edge = (state._schemaEdges || []).find(
-        (e) => e.fromObject === describe.name && e.fromField === row.getAttribute("data-field")
-      );
-      if (!edge && !row.classList.contains("is-rel")) return;
-      highlightSchemaRelation(edge || null, {
-        objects: [describe.name, ...(row.getAttribute("data-rel-targets") || "").split(",").filter(Boolean)],
-        fieldEl: row
-      });
-    });
-    row.addEventListener("mouseleave", () => highlightSchemaRelation(null));
-    row.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const fieldName = row.getAttribute("data-field");
-      const objectName = row.getAttribute("data-object") || describe.name;
-      const field = (describe.fields || []).find((f) => f.name === fieldName);
-      if (!field) return;
-      openSchemaFieldMenu({
-        field,
-        objectName,
-        anchorEl: row,
-        clientX: e.clientX,
-        clientY: e.clientY
-      });
-    });
-  });
   return card;
 }
 
-function bindSchemaCardDrag(card, objectName) {
-  const handle = card.querySelector(".sb-card-head");
-  if (!handle) return;
+function bindSchemaCardDrag(card, describe, isCenter) {
   let dragging = false;
   let moved = false;
   let lastX = 0;
   let lastY = 0;
-  handle.addEventListener("pointerdown", (e) => {
+  let startTarget = null;
+
+  card.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
+    if (e.target.closest("button")) return;
     e.stopPropagation();
     dragging = true;
     moved = false;
-    card.dataset.didDrag = "0";
+    startTarget = e.target;
     lastX = e.clientX;
     lastY = e.clientY;
+    card.dataset.didDrag = "0";
+    state.schemaMovingCard = describe.name;
     card.classList.add("is-dragging");
-    handle.setPointerCapture?.(e.pointerId);
+    card.setPointerCapture?.(e.pointerId);
   });
-  handle.addEventListener("pointermove", (e) => {
+  card.addEventListener("pointermove", (e) => {
     if (!dragging) return;
     const scale = state.schemaView?.scale || 1;
-    const dx = (e.clientX - lastX) / scale;
-    const dy = (e.clientY - lastY) / scale;
     if (!moved && Math.hypot(e.clientX - lastX, e.clientY - lastY) < 6) return;
     moved = true;
     card.dataset.didDrag = "1";
+    const dx = (e.clientX - lastX) / scale;
+    const dy = (e.clientY - lastY) / scale;
     lastX = e.clientX;
     lastY = e.clientY;
     const left = (parseFloat(card.style.left) || 0) + dx;
@@ -2955,19 +3003,55 @@ function bindSchemaCardDrag(card, objectName) {
     card.style.top = `${top}px`;
     state.schemaCardPositions = {
       ...(state.schemaCardPositions || {}),
-      [objectName]: { x: left, y: top }
+      [describe.name]: { x: left, y: top }
     };
     drawSchemaLines();
   });
-  const endDrag = () => {
+  const finish = (e) => {
     if (!dragging) return;
     dragging = false;
+    state.schemaMovingCard = "";
     card.classList.remove("is-dragging");
+    if (moved) return;
+    const fieldRow = startTarget?.closest?.(".sb-field[data-field]");
+    if (fieldRow) {
+      const fieldName = fieldRow.getAttribute("data-field");
+      const field = (describe.fields || []).find((f) => f.name === fieldName);
+      if (!field) return;
+      openSchemaFieldMenu({
+        field,
+        objectName: describe.name,
+        anchorEl: fieldRow,
+        clientX: e.clientX,
+        clientY: e.clientY
+      });
+      return;
+    }
+    if (!isCenter) {
+      onLoadSchema({ resetTrail: false, sobject: describe.name }).catch(() => {});
+    }
   };
-  handle.addEventListener("pointerup", endDrag);
-  handle.addEventListener("pointercancel", endDrag);
+  card.addEventListener("pointerup", finish);
+  card.addEventListener("pointercancel", () => {
+    dragging = false;
+    moved = false;
+    state.schemaMovingCard = "";
+    card.classList.remove("is-dragging");
+  });
+  card.querySelectorAll(".sb-field[data-field]").forEach((row) => {
+    row.addEventListener("mouseenter", () => {
+      const edge = (state._schemaEdges || []).find(
+        (ed) => ed.fromObject === describe.name && ed.fromField === row.getAttribute("data-field")
+      );
+      if (!edge && !row.classList.contains("is-rel")) return;
+      highlightSchemaRelation(edge || null, {
+        objects: [describe.name, ...(row.getAttribute("data-rel-targets") || "").split(",").filter(Boolean)],
+        fieldEl: row
+      });
+    });
+    row.addEventListener("mouseleave", () => highlightSchemaRelation(null));
+  });
 }
-
 function hideSchemaFieldMenu() {
   const menu = $("#schemaFieldMenu");
   if (!menu) return;
@@ -2984,19 +3068,31 @@ function openSchemaFieldMenu({ field, objectName, anchorEl, clientX, clientY }) 
   const edge = (state._schemaEdges || []).find(
     (e) => e.fromObject === objectName && e.fromField === field.name
   );
-  const items = [
-    { id: "copy-api", label: `Copy ${field.name}` },
-    { id: "copy-select", label: "Copy SELECT snippet" }
-  ];
-  if (edge) items.push({ id: "highlight-edge", label: "Highlight relationship line" });
-  if (parentTargets.length) {
-    items.push({ id: "query-parent", label: `Query via ${field.relationshipName || field.name}` });
-    items.push({
-      id: "open-parent",
-      label: parentTargets.length === 1 ? `Open ${parentTargets[0]}` : `Open ${parentTargets[0]}…`
-    });
+  const simple = state.schemaSimpleMode !== false;
+  const labels = state.schemaLabels || {};
+  const items = [];
+  if (simple) {
+    items.push({ id: "explain", label: friendlyFieldHint(field, labels) });
+    if (edge) items.push({ id: "highlight-edge", label: "Show the connection" });
+    if (parentTargets.length) {
+      items.push({
+        id: "open-parent",
+        label: `Open ${labels[parentTargets[0]] || parentTargets[0]}`
+      });
+    }
+  } else {
+    items.push({ id: "copy-api", label: `Copy ${field.name}` });
+    items.push({ id: "copy-select", label: "Copy SELECT snippet" });
+    if (edge) items.push({ id: "highlight-edge", label: "Highlight relationship line" });
+    if (parentTargets.length) {
+      items.push({ id: "query-parent", label: `Query via ${field.relationshipName || field.name}` });
+      items.push({
+        id: "open-parent",
+        label: parentTargets.length === 1 ? `Open ${parentTargets[0]}` : `Open ${parentTargets[0]}…`
+      });
+    }
+    items.push({ id: "query-field", label: "Query this field" });
   }
-  items.push({ id: "query-field", label: "Query this field" });
 
   menu.innerHTML = items
     .map(
@@ -3030,6 +3126,10 @@ function openSchemaFieldMenu({ field, objectName, anchorEl, clientX, clientY }) 
       const action = btn.getAttribute("data-action");
       const describe = state.schemaDescribe;
       hideSchemaFieldMenu();
+      if (action === "explain") {
+        previewSchemaSoql(friendlyFieldHint(field, state.schemaLabels || {}));
+        return;
+      }
       if (action === "copy-api") {
         try {
           await navigator.clipboard.writeText(field.name);
@@ -3134,7 +3234,7 @@ function drawSchemaLines() {
     });
     const highlighted = state.schemaHighlightedEdgeId === edge.id;
     const baseClass = edge.kind === "masterdetail" ? "sb-line sb-line-md" : "sb-line";
-    const label = edgeLabelText(edge);
+    const label = edgeLabelText(edge, { simple: state.schemaSimpleMode !== false });
 
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     group.setAttribute("class", `sb-edge${highlighted ? " is-highlight" : ""}`);
@@ -3207,6 +3307,9 @@ function highlightSchemaRelation(edge, extra = {}) {
   }
   const hovering = objects.size > 0;
   world?.classList.toggle("is-rel-hover", hovering);
+  if (state.schemaDescribe) {
+    renderSchemaStory(state.schemaDescribe, hovering ? edge || null : null);
+  }
   for (const card of cardsHost.querySelectorAll(".sb-card")) {
     const name = card.dataset.object;
     card.classList.toggle("is-related", hovering && objects.has(name));
@@ -3233,6 +3336,9 @@ function onSchemaEdgeClick(edge) {
   if (!edge) return;
   state.schemaHighlightedEdgeId = edge.id;
   drawSchemaLines();
+  const labels = state.schemaLabels || {};
+  previewSchemaSoql(plainRelationshipSentence(edge, labels));
+  if (state.schemaSimpleMode !== false) return;
   const center = state.schemaDescribe;
   if (!center) return;
 
@@ -3268,6 +3374,32 @@ function onSchemaEdgeClick(edge) {
 function renderSchemaActions(describe) {
   const root = $("#schemaActions");
   if (!root) return;
+  const simple = state.schemaSimpleMode !== false;
+  if (simple) {
+    root.innerHTML = `
+      <button type="button" class="btn primary" id="schemaOpenRelated">Open a linked record type</button>
+      <button type="button" class="btn" id="schemaOpenDescribe">See all fields</button>
+      <button type="button" class="btn ghost" id="schemaSendNl">Ask in plain English</button>
+    `;
+    $("#schemaOpenRelated")?.addEventListener("click", () => {
+      const first = state.schemaParents?.[0]?.targetObject || state.schemaChildren?.[0]?.childObject;
+      if (first) onLoadSchema({ resetTrail: false, sobject: first }).catch(() => {});
+    });
+    $("#schemaOpenDescribe")?.addEventListener("click", () => {
+      const search = $("#describeObjectSearch");
+      if (search) search.value = describe.name;
+      showView("describe");
+      onLoadDescribe().catch(() => {});
+    });
+    $("#schemaSendNl")?.addEventListener("click", () => {
+      const nl = $("#nlInput");
+      if (nl) {
+        nl.value = `Show me ${describe.label || describe.name} records and how they connect to related records`;
+      }
+      showView("nl-soql");
+    });
+    return;
+  }
   root.innerHTML = `
     <button type="button" class="btn primary" id="schemaQueryObject">Query this object</button>
     <button type="button" class="btn" id="schemaOpenDescribe">Open in Describe</button>
