@@ -21,6 +21,11 @@ import {
   INACTIVE_FLOW_STATUSES
 } from "../lib/flow-cleaner.js";
 import {
+  buildFlowVersionsQuery,
+  buildFlowDefinitionSearchQuery,
+  assertFlowApiName
+} from "../lib/flow-version-compare.js";
+import {
   filterGlobalObjects,
   normalizeObjectDescribe,
   isCustomObjectName,
@@ -109,11 +114,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       listPackageTypeMembers(message.tabUrl, message.typeName, message.apiVersion),
     listInactiveFlowVersions: () =>
       listInactiveFlowVersions(message.tabUrl, message.needle, message.includeMetadata, message.apiVersion),
+    listFlowDefinitions: () => listFlowDefinitions(message.tabUrl, message.query, message.apiVersion),
+    listFlowVersions: () => listFlowVersions(message.tabUrl, message.apiName, message.apiVersion),
+    getFlowVersionDetail: () => getFlowVersionDetail(message.tabUrl, message.flowId, message.apiVersion),
     deleteFlowVersions: () => deleteFlowVersions(message.tabUrl, message.ids, message.apiVersion),
     executeAnonymous: () => executeAnonymous(message.tabUrl, message.apex, message.apiVersion),
     fetchLatestApexDebug: () => fetchLatestApexDebug(message.tabUrl, message.apiVersion),
     getExtensionVersion: async () => ({
-      version: "1.9.7",
+      version: "1.9.8",
       hasSearchMetadata: typeof searchMetadata === "function",
       hasFlowCleaner: typeof listInactiveFlowVersions === "function",
       hasExecuteAnonymous: typeof executeAnonymous === "function",
@@ -1934,6 +1942,91 @@ async function listPackageTypeMembers(tabUrl, typeName, apiVersion = DEFAULT_API
       }))
     };
   }
+}
+
+async function listFlowDefinitions(tabUrl, query = "", apiVersion = DEFAULT_API_VERSION) {
+  const needle = String(query || "").trim();
+  if (needle && !/^[A-Za-z0-9_ ]{1,80}$/.test(needle)) {
+    throw new Error("Search may only use letters, numbers, spaces, or underscores.");
+  }
+  const q = buildFlowDefinitionSearchQuery(needle);
+  try {
+    const page = await runSoql(tabUrl, q, apiVersion);
+    const records = page.records || [];
+    return {
+      flows: records.map((r) => ({
+        apiName: r.ApiName,
+        label: r.Label || r.ApiName,
+        processType: r.ProcessType || "",
+        triggerType: r.TriggerType || "",
+        isActive: !!r.IsActive
+      }))
+    };
+  } catch {
+    const tooling =
+      "SELECT Id, DeveloperName, MasterLabel, NamespacePrefix, LastModifiedDate FROM FlowDefinition ORDER BY LastModifiedDate DESC LIMIT 40";
+    const page = await toolingQuery(tabUrl, tooling, apiVersion);
+    const needleLc = needle.toLowerCase();
+    const flows = (page.records || [])
+      .map((r) => {
+        const apiName = memberName(r.NamespacePrefix, r.DeveloperName);
+        return {
+          apiName,
+          label: r.MasterLabel || apiName,
+          processType: "",
+          triggerType: "",
+          isActive: null
+        };
+      })
+      .filter((f) => !needleLc || f.apiName.toLowerCase().includes(needleLc) || f.label.toLowerCase().includes(needleLc));
+    return { flows };
+  }
+}
+
+async function listFlowVersions(tabUrl, apiName, apiVersion = DEFAULT_API_VERSION) {
+  const name = assertFlowApiName(apiName);
+  const { session } = await getOrgSessionStrict(tabUrl);
+  if (!session?.sid) {
+    throw new Error("No Salesforce session cookie for that org. Open a logged-in tab for it.");
+  }
+  await ensureHostFetchAllowed(session.apiBase);
+  const page = await queryAllRecords(session, buildFlowVersionsQuery(name), {
+    tooling: true,
+    apiVersion,
+    maxRows: 200
+  });
+  return {
+    apiName: name,
+    truncated: !!page.truncated,
+    versions: (page.records || []).map((flow) => ({
+      ...summarizeFlowVersion(flow),
+      definitionName: flow.Definition?.DeveloperName || name
+    }))
+  };
+}
+
+async function getFlowVersionDetail(tabUrl, flowId, apiVersion = DEFAULT_API_VERSION) {
+  const id = String(flowId || "").trim();
+  if (!/^[a-zA-Z0-9]{15,18}$/.test(id)) throw new Error("Pick a flow version from the list.");
+  const { session } = await getOrgSessionStrict(tabUrl);
+  if (!session?.sid) {
+    throw new Error("No Salesforce session cookie for that org. Open a logged-in tab for it.");
+  }
+  await ensureHostFetchAllowed(session.apiBase);
+  const detailUrl = restUrl(session.apiBase, `/tooling/sobjects/Flow/${id}`, apiVersion);
+  const detail = await sfFetchUrl(detailUrl, session.sid);
+  if (!detail?.Id) throw new Error("Could not load that flow version.");
+  return {
+    Id: detail.Id,
+    MasterLabel: detail.MasterLabel,
+    Status: detail.Status,
+    VersionNumber: detail.VersionNumber,
+    ProcessType: detail.ProcessType,
+    LastModifiedDate: detail.LastModifiedDate,
+    FullName: detail.FullName || null,
+    Definition: detail.Definition || null,
+    Metadata: detail.Metadata || {}
+  };
 }
 
 async function listInactiveFlowVersions(

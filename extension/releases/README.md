@@ -10,9 +10,14 @@
 **GitHub raw (this branch):**
 
 - Store: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-store.zip
-- Versioned: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-1.9.7-store.zip
+- Versioned: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-1.9.8-store.zip
 
-## Current version: 1.9.7
+## Current version: 1.9.8
+
+### 1.9.8 notes
+
+- Org Compare → **Two flow versions**: pick any versions in the same org or across two orgs
+- Diffs header + elements (screens, gets, decisions, etc.); canvas layout is ignored
 
 ### 1.9.7 notes
 

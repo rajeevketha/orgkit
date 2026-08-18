@@ -118,6 +118,12 @@ import {
   commonCompareCategoryIds,
   compareAttrLabel
 } from "../lib/org-compare.js";
+import {
+  formatFlowVersionChoice,
+  defaultVersionPair,
+  summarizeFlowVersionRecord,
+  diffFlowVersions
+} from "../lib/flow-version-compare.js";
 
 const FEATURES = [
   {
@@ -137,7 +143,7 @@ const FEATURES = [
   {
     id: "org-compare",
     title: "Org Compare",
-    blurb: "UAT vs Prod — objects, fields, and which flow version is live"
+    blurb: "UAT vs Prod drift, or any two flow versions"
   },
   { id: "meta-open", title: "Metadata Quick Open", blurb: "Open classes, flows, LWCs, and more" },
   { id: "package", title: "Package.xml Builder", blurb: "Build package.xml from selected members" },
@@ -268,7 +274,15 @@ const state = {
     categoryFilter: "",
     selectedCategories: defaultCompareCategoryIds(),
     running: false,
-    progress: 0
+    progress: 0,
+    uiMode: "inventory"
+  },
+  flowVersionCompare: {
+    leftVersions: [],
+    rightVersions: [],
+    leftApiName: "",
+    rightApiName: "",
+    result: null
   }
 };
 
@@ -406,6 +420,7 @@ function showView(id) {
   }
   if (id === "org-compare") {
     renderCompareCategoryPicker();
+    applyOrgCompareUiMode();
     loadCompareOrgs().catch(() => {});
   }
 }
@@ -646,8 +661,15 @@ function bindFeatureActions() {
   $("#scanFlowFieldRefs").addEventListener("click", () => onLoadInactiveFlows(true));
   $("#openFlowVersionCompare")?.addEventListener("click", () => {
     state.orgCompare.selectedCategories = ["flows"];
+    state.orgCompare.uiMode = "inventory";
     showView("org-compare");
+    applyOrgCompareUiMode();
     renderCompareCategoryPicker();
+  });
+  $("#openTwoFlowVersions")?.addEventListener("click", () => {
+    state.orgCompare.uiMode = "flowVersions";
+    showView("org-compare");
+    applyOrgCompareUiMode();
   });
   $("#flowCleanFilter").addEventListener("input", () => renderInactiveFlows());
   $("#selectAllInactiveFlows").addEventListener("click", () => {
@@ -700,6 +722,21 @@ function bindFeatureActions() {
   $("#compareCatsNone")?.addEventListener("click", () => {
     state.orgCompare.selectedCategories = [];
     renderCompareCategoryPicker();
+  });
+  document.querySelectorAll("[data-compare-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.orgCompare.uiMode = btn.getAttribute("data-compare-mode") || "inventory";
+      applyOrgCompareUiMode();
+    });
+  });
+  $("#findFlowVersionDefs")?.addEventListener("click", () => onFindFlowDefinitions().catch(() => {}));
+  $("#loadFlowVersions")?.addEventListener("click", () => onLoadFlowVersions().catch(() => {}));
+  $("#runFlowVersionCompare")?.addEventListener("click", () => onRunFlowVersionCompare().catch(() => {}));
+  $("#flowVersionApiName")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onLoadFlowVersions().catch(() => {});
+    }
   });
   $("#compareCategoryList")?.addEventListener("change", (e) => {
     const input = e.target.closest('input[data-compare-cat]');
@@ -4097,6 +4134,244 @@ function setCompareTab(tab) {
     b.classList.toggle("active", b.getAttribute("data-compare-tab") === next);
   });
   renderOrgCompareResults();
+}
+
+function applyOrgCompareUiMode() {
+  const mode = state.orgCompare.uiMode === "flowVersions" ? "flowVersions" : "inventory";
+  state.orgCompare.uiMode = mode;
+  $("#compareInventoryPanel")?.classList.toggle("hidden", mode !== "inventory");
+  $("#compareFlowVersionPanel")?.classList.toggle("hidden", mode !== "flowVersions");
+  document.querySelectorAll("[data-compare-mode]").forEach((btn) => {
+    btn.classList.toggle("active", btn.getAttribute("data-compare-mode") === mode);
+  });
+  const hint = $("#compareModeHint");
+  if (hint) {
+    hint.textContent =
+      mode === "flowVersions"
+        ? "A and B can be the same org. Load versions, then pick any two."
+        : "Scan orgs needs two different orgs. Use Two flow versions to compare drafts inside one sandbox.";
+  }
+}
+
+function fillFlowVersionSelect(select, versions, selectedId) {
+  if (!select) return;
+  const opts = versions.length
+    ? versions.map((v) => {
+        const selected = v.id === selectedId ? "selected" : "";
+        return `<option value="${escapeHtml(v.id)}" ${selected}>${escapeHtml(formatFlowVersionChoice(v))}</option>`;
+      })
+    : `<option value="">No versions loaded</option>`;
+  select.innerHTML = opts;
+}
+
+function renderFlowVersionDefPicks(flows) {
+  const host = $("#flowVersionDefPicks");
+  const list = $("#flowVersionApiList");
+  if (list) {
+    list.innerHTML = (flows || [])
+      .map((f) => `<option value="${escapeHtml(f.apiName)}">${escapeHtml(f.label || f.apiName)}</option>`)
+      .join("");
+  }
+  if (!host) return;
+  if (!flows?.length) {
+    host.classList.add("hidden");
+    host.innerHTML = "";
+    return;
+  }
+  host.classList.remove("hidden");
+  host.innerHTML = flows
+    .slice(0, 12)
+    .map(
+      (f) =>
+        `<button type="button" class="flow-version-def-btn" data-flow-api="${escapeHtml(f.apiName)}">${escapeHtml(
+          f.label || f.apiName
+        )} <code>${escapeHtml(f.apiName)}</code></button>`
+    )
+    .join("");
+  host.querySelectorAll("[data-flow-api]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const name = btn.getAttribute("data-flow-api") || "";
+      const input = $("#flowVersionApiName");
+      if (input) input.value = name;
+      onLoadFlowVersions().catch(() => {});
+    });
+  });
+}
+
+async function onFindFlowDefinitions() {
+  const status = $("#flowVersionStatus");
+  const leftKey = $("#compareOrgLeft")?.value;
+  const rightKey = $("#compareOrgRight")?.value;
+  const left = getCompareOrgByKey(leftKey);
+  const right = getCompareOrgByKey(rightKey);
+  if (!left?.tabUrl) {
+    if (status) status.textContent = "Pick org A first.";
+    return;
+  }
+  const q = ($("#flowVersionApiName")?.value || "").trim();
+  if (status) status.textContent = "Searching flows…";
+  try {
+    const apiVer = apiVersion();
+    const jobs = [send("listFlowDefinitions", { tabUrl: left.tabUrl, query: q, apiVersion: apiVer })];
+    if (right?.tabUrl && right.orgKey !== left.orgKey) {
+      jobs.push(send("listFlowDefinitions", { tabUrl: right.tabUrl, query: q, apiVersion: apiVer }));
+    }
+    const results = await Promise.all(jobs);
+    const seen = new Map();
+    for (const res of results) {
+      if (!res.ok) throw new Error(res.error);
+      for (const f of res.result?.flows || []) {
+        if (f?.apiName && !seen.has(f.apiName)) seen.set(f.apiName, f);
+      }
+    }
+    const flows = [...seen.values()];
+    renderFlowVersionDefPicks(flows);
+    if (status) {
+      status.textContent = flows.length
+        ? `${flows.length} matching flow${flows.length === 1 ? "" : "s"}. Click one, or Load versions.`
+        : "No matching flows in the selected org(s).";
+    }
+  } catch (e) {
+    if (status) status.textContent = e.message || String(e);
+  }
+}
+
+async function onLoadFlowVersions() {
+  const status = $("#flowVersionStatus");
+  const apiName = ($("#flowVersionApiName")?.value || "").trim();
+  const leftKey = $("#compareOrgLeft")?.value;
+  const rightKey = $("#compareOrgRight")?.value;
+  const left = getCompareOrgByKey(leftKey);
+  const right = getCompareOrgByKey(rightKey);
+  if (!left?.tabUrl || !right?.tabUrl) {
+    if (status) status.textContent = "Pick org A and org B. They can be the same org.";
+    return;
+  }
+  if (!apiName) {
+    if (status) status.textContent = "Enter a flow API name, or Find first.";
+    return;
+  }
+  if (status) status.textContent = "Loading versions…";
+  try {
+    const apiVer = apiVersion();
+    const sameOrg = left.orgKey === right.orgKey;
+    const leftRes = await send("listFlowVersions", { tabUrl: left.tabUrl, apiName, apiVersion: apiVer });
+    if (!leftRes.ok) throw new Error(leftRes.error);
+    const rightRes = sameOrg
+      ? leftRes
+      : await send("listFlowVersions", { tabUrl: right.tabUrl, apiName, apiVersion: apiVer });
+    if (!rightRes.ok) throw new Error(rightRes.error);
+    const leftVersions = leftRes.result?.versions || [];
+    const rightVersions = rightRes.result?.versions || [];
+    state.flowVersionCompare.leftVersions = leftVersions;
+    state.flowVersionCompare.rightVersions = rightVersions;
+    state.flowVersionCompare.leftApiName = apiName;
+    state.flowVersionCompare.rightApiName = apiName;
+    const leftPair = defaultVersionPair(leftVersions);
+    const rightPair = defaultVersionPair(rightVersions);
+    if (sameOrg) {
+      fillFlowVersionSelect($("#flowVersionLeft"), leftVersions, leftPair.leftId);
+      fillFlowVersionSelect($("#flowVersionRight"), rightVersions, leftPair.rightId);
+    } else {
+      const leftActive = leftVersions.find((v) => v.isActive)?.id || leftPair.rightId;
+      const rightActive = rightVersions.find((v) => v.isActive)?.id || rightPair.rightId;
+      fillFlowVersionSelect($("#flowVersionLeft"), leftVersions, leftActive);
+      fillFlowVersionSelect($("#flowVersionRight"), rightVersions, rightActive);
+    }
+    if (status) {
+      const aNote = leftVersions.length ? `${leftVersions.length} in A` : "none in A";
+      const bNote = rightVersions.length ? `${rightVersions.length} in B` : "none in B";
+      status.textContent = `Loaded versions (${aNote}, ${bNote}). Pick two, then Compare these versions.`;
+    }
+  } catch (e) {
+    if (status) status.textContent = e.message || String(e);
+  }
+}
+
+async function onRunFlowVersionCompare() {
+  const status = $("#flowVersionStatus");
+  const leftKey = $("#compareOrgLeft")?.value;
+  const rightKey = $("#compareOrgRight")?.value;
+  const left = getCompareOrgByKey(leftKey);
+  const right = getCompareOrgByKey(rightKey);
+  const leftId = $("#flowVersionLeft")?.value;
+  const rightId = $("#flowVersionRight")?.value;
+  if (!left?.tabUrl || !right?.tabUrl) {
+    if (status) status.textContent = "Pick org A and org B. They can be the same org.";
+    return;
+  }
+  if (!leftId || !rightId) {
+    if (status) status.textContent = "Load versions and pick one on each side.";
+    return;
+  }
+  if (left.orgKey === right.orgKey && leftId === rightId) {
+    if (status) status.textContent = "Pick two different versions to compare.";
+    return;
+  }
+  if (status) status.textContent = "Loading the two selected versions…";
+  try {
+    const apiVer = apiVersion();
+    const [leftRes, rightRes] = await Promise.all([
+      send("getFlowVersionDetail", { tabUrl: left.tabUrl, flowId: leftId, apiVersion: apiVer }),
+      send("getFlowVersionDetail", { tabUrl: right.tabUrl, flowId: rightId, apiVersion: apiVer })
+    ]);
+    if (!leftRes.ok) throw new Error(leftRes.error);
+    if (!rightRes.ok) throw new Error(rightRes.error);
+    const leftSum = summarizeFlowVersionRecord(leftRes.result);
+    const rightSum = summarizeFlowVersionRecord(rightRes.result);
+    const diff = diffFlowVersions(leftSum, rightSum);
+    state.flowVersionCompare.result = { left: leftSum, right: rightSum, diff };
+    renderFlowVersionResults();
+    if (status) status.textContent = diff.summary;
+  } catch (e) {
+    if (status) status.textContent = e.message || String(e);
+  }
+}
+
+function renderFlowVersionResults() {
+  const root = $("#flowVersionResults");
+  const packed = state.flowVersionCompare.result;
+  if (!root) return;
+  if (!packed) {
+    root.innerHTML = "";
+    return;
+  }
+  const { left, right, diff } = packed;
+  const aLabel = `${left.definitionName || left.name || "A"} ${formatFlowVersionChoice(left)}`;
+  const bLabel = `${right.definitionName || right.name || "B"} ${formatFlowVersionChoice(right)}`;
+  const headerHtml = diff.header.length
+    ? `<div class="compare-sbs">
+        <div class="compare-sbs-head"><span>Header</span><span>${escapeHtml(aLabel)}</span><span>${escapeHtml(bLabel)}</span></div>
+        ${diff.header
+          .map(
+            (r) =>
+              `<div class="compare-sbs-row compare-sbs-attr"><span>${escapeHtml(r.label)}</span><span>${escapeHtml(r.left)}</span><span>${escapeHtml(r.right)}</span></div>`
+          )
+          .join("")}
+      </div>`
+    : `<p class="hint">Headers match.</p>`;
+  const elRow = (el, extra = "") =>
+    `<li class="flow-version-el"><strong>${escapeHtml(el.typeLabel || "")}</strong> <code>${escapeHtml(el.name || "")}</code> ${escapeHtml(el.label || "")}${
+      extra || (el.hint ? ` <span class="flow-version-hint">${escapeHtml(el.hint)}</span>` : "")
+    }</li>`;
+  const onlyA = diff.onlyA.length
+    ? `<div class="compare-field-block"><div class="compare-field-block-title">Only in A</div><ul class="compare-field-list">${diff.onlyA.map((el) => elRow(el)).join("")}</ul></div>`
+    : "";
+  const onlyB = diff.onlyB.length
+    ? `<div class="compare-field-block"><div class="compare-field-block-title">Only in B</div><ul class="compare-field-list">${diff.onlyB.map((el) => elRow(el)).join("")}</ul></div>`
+    : "";
+  const changed = diff.changed.length
+    ? `<div class="compare-field-block"><div class="compare-field-block-title">Changed</div><ul class="compare-field-list">${diff.changed
+        .map((el) =>
+          elRow(el, ` <span class="flow-version-hint">${escapeHtml(el.leftHint || "—")} → ${escapeHtml(el.rightHint || "—")}</span>`)
+        )
+        .join("")}</ul></div>`
+    : "";
+  root.innerHTML = `<div class="compare-row">
+    <div class="compare-row-head"><span>${escapeHtml(diff.summary)}</span></div>
+    ${headerHtml}
+    ${onlyA}${onlyB}${changed}
+  </div>`;
 }
 
 function renderCompareCategoryPicker() {

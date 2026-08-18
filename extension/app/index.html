@@ -335,9 +335,10 @@
   <!-- FEATURE: Org Compare -->
   <section id="view-org-compare" class="view">
     <p class="hint">
-      Compare two logged-in Salesforce orgs (UAT vs Prod). Pick what to scan — objects, profiles, perm sets,
-      <strong>active flow versions</strong>, Apex, and more.
-      OrgKit uses tabs and cookie sessions in this Chrome profile. No passwords; <code>sid</code> is never stored.
+      Compare two logged-in Salesforce orgs, or two versions of one flow.
+      <strong>Scan orgs</strong> is inventory drift (including which flow version is live).
+      <strong>Two flow versions</strong> lets you pick any versions — same org or two orgs.
+      No passwords; <code>sid</code> is never stored.
     </p>
 
     <div class="compare-chooser">
@@ -376,6 +377,19 @@
         <div class="compare-org-meta" id="compareMetaRight">Pick a logged-in Salesforce session</div>
       </div>
     </div>
+    <div class="compare-mode-tabs" role="tablist" aria-label="Compare mode">
+      <button type="button" class="compare-mode-tab active" data-compare-mode="inventory" id="compareModeInventory">
+        Scan orgs
+      </button>
+      <button type="button" class="compare-mode-tab" data-compare-mode="flowVersions" id="compareModeFlowVersions">
+        Two flow versions
+      </button>
+    </div>
+    <p class="hint" id="compareModeHint">
+      Scan orgs lists what is live in each org. Two flow versions lets you pick any version in the same org or across two orgs.
+    </p>
+
+    <div id="compareInventoryPanel">
     <div class="compare-categories">
       <div class="compare-categories-head">
         <div class="label" style="margin-top:0">What to compare</div>
@@ -421,6 +435,43 @@
       <button type="button" class="btn" id="copyComparePackageMembers">Copy package.xml members</button>
     </div>
     <div id="compareResults" class="compare-results"></div>
+    </div>
+
+    <div id="compareFlowVersionPanel" class="hidden">
+      <p class="hint">
+        Pick the same org twice to compare v3 vs v8 in one sandbox, or two orgs to compare a version in UAT with one in Prod.
+        OrgKit loads version lists first, then fetches only the two versions you select (not every flow’s Metadata).
+      </p>
+      <label class="label" for="flowVersionApiName">Flow API name or search</label>
+      <div class="row wrap">
+        <input
+          id="flowVersionApiName"
+          class="input grow"
+          list="flowVersionApiList"
+          placeholder="Order_Flow or search by label"
+          autocomplete="off"
+        />
+        <datalist id="flowVersionApiList"></datalist>
+        <button type="button" class="btn" id="findFlowVersionDefs">Find</button>
+        <button type="button" class="btn primary" id="loadFlowVersions">Load versions</button>
+      </div>
+      <div id="flowVersionDefPicks" class="flow-version-def-picks hidden"></div>
+      <div class="flow-version-picks">
+        <div class="flow-version-pick">
+          <label class="label" for="flowVersionLeft">Version A</label>
+          <select id="flowVersionLeft" class="select block-select"></select>
+        </div>
+        <div class="flow-version-pick">
+          <label class="label" for="flowVersionRight">Version B</label>
+          <select id="flowVersionRight" class="select block-select"></select>
+        </div>
+      </div>
+      <div class="row wrap" style="margin-top:8px">
+        <button type="button" class="btn primary" id="runFlowVersionCompare">Compare these versions</button>
+      </div>
+      <div id="flowVersionStatus" class="hint"></div>
+      <div id="flowVersionResults" class="compare-results"></div>
+    </div>
   </section>
 
   <!-- FEATURE: Metadata Quick Open -->
@@ -462,6 +513,8 @@
       <strong>Active versions are never deleted.</strong>
       To see whether sandbox and production are on the same live version, use
       <button type="button" class="linkish" id="openFlowVersionCompare">Org Compare → Active flow versions</button>.
+      To diff v3 vs v8 in one org (or across orgs), use
+      <button type="button" class="linkish" id="openTwoFlowVersions">Two flow versions</button>.
     </p>
     <label class="label" for="flowCleanObject">Object API (optional)</label>
     <input id="flowCleanObject" class="input" placeholder="MyObject__c" />
