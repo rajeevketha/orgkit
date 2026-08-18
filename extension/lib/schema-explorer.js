@@ -374,34 +374,96 @@ export function assignEdgeSpread(edges = []) {
 }
 
 /**
- * Orthogonal-ish cubic path from a source field/card box to a related card.
- * @param {{ x: number, y: number, w: number, h: number }} fromBox
- * @param {{ x: number, y: number, w: number, h: number }} toBox
+ * Prefer everyday related objects on the map. Change events, shares, history,
+ * and feeds are real Salesforce children but they crowd out Contact / Opportunity.
+ * Higher score is shown first when the canvas is capped.
  */
+export function relatedObjectMapScore(name) {
+  const n = String(name || "");
+  if (/ChangeEvent$/i.test(n)) return 10;
+  if (/Share$/i.test(n)) return 20;
+  if (/History$/i.test(n)) return 30;
+  if (/Feed$/i.test(n)) return 40;
+  if (/__e$/i.test(n)) return 50;
+  if (/CleanInfo$/i.test(n) || /PartnerRole$/i.test(n)) return 60;
+  return 100;
+}
+
+export function pickMapRelatedNames(names = [], { limit = 8, centerName = "" } = {}) {
+  const unique = [...new Set(names.filter(Boolean).filter((n) => n !== centerName))];
+  unique.sort(
+    (a, b) => relatedObjectMapScore(b) - relatedObjectMapScore(a) || String(a).localeCompare(String(b))
+  );
+  return unique.slice(0, Math.max(0, limit));
+}
+
+/** Keep only edges whose both ends are on the canvas. */
+export function edgesForVisibleCards(edges = [], visibleNames = []) {
+  const vis = new Set(visibleNames.filter(Boolean));
+  return (edges || []).filter((e) => vis.has(e.fromObject) && vis.has(e.toObject));
+}
+
+/** One line per object pair so Simple mode does not draw a spaghetti of duplicate lookups. */
+export function dedupeEdgesByObjectPair(edges = []) {
+  const seen = new Set();
+  const out = [];
+  for (const e of edges) {
+    const key = `${e.fromObject}|${e.toObject}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...e, spreadIndex: 0, spreadCount: 1 });
+  }
+  return out;
+}
+
 export function routeRelationshipPath({ fromBox, toBox, index = 0, count = 1 } = {}) {
   const from = fromBox || { x: 0, y: 0, w: 0, h: 0 };
   const to = toBox || { x: 0, y: 0, w: 0, h: 0 };
-  const spread = Math.max(0, count - 1) * 18;
-  const offset = count > 1 ? -spread / 2 + index * 18 : 0;
-  const x1 = from.x + from.w;
-  const y1 = from.y + from.h / 2;
-  const toMid = to.x + to.w / 2 + offset;
-  const x2 = Math.max(to.x + 18, Math.min(to.x + to.w - 18, toMid));
-  const fromCenterY = from.y + from.h / 2;
-  const toCenterY = to.y + to.h / 2;
-  const goingUp = fromCenterY > toCenterY;
-  const y2 = goingUp ? to.y + to.h - 6 : to.y + 12;
-  const midY = (y1 + y2) / 2 + offset * 0.35;
-  const out = 56 + Math.abs(offset);
-  const d = `M ${x1} ${y1} C ${x1 + out} ${y1}, ${x2} ${midY}, ${x2} ${y2}`;
+  const spread = Math.max(0, count - 1) * 22;
+  const offset = count > 1 ? -spread / 2 + index * 22 : 0;
+  const fromCx = from.x + from.w / 2;
+  const fromCy = from.y + from.h / 2;
+  const toCx = to.x + to.w / 2;
+  const toCy = to.y + to.h / 2;
+  const dx = toCx - fromCx;
+  const dy = toCy - fromCy;
+
+  let x1;
+  let y1;
+  let x2;
+  let y2;
+  if (Math.abs(dy) >= Math.abs(dx) * 0.7) {
+    x1 = fromCx + offset;
+    x2 = toCx + offset;
+    if (dy < 0) {
+      y1 = from.y;
+      y2 = to.y + to.h;
+    } else {
+      y1 = from.y + from.h;
+      y2 = to.y;
+    }
+  } else {
+    y1 = fromCy + offset;
+    y2 = toCy + offset;
+    if (dx >= 0) {
+      x1 = from.x + from.w;
+      x2 = to.x;
+    } else {
+      x1 = from.x;
+      x2 = to.x + to.w;
+    }
+  }
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  const d = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
   return {
     d,
     x1,
     y1,
     x2,
     y2,
-    labelX: (x1 + x2) / 2,
-    labelY: midY - 8
+    labelX: mx,
+    labelY: my - 8
   };
 }
 
@@ -436,10 +498,18 @@ export function joinLabels(items = []) {
   return `${a.slice(0, -1).join(", ")}, and ${a[a.length - 1]}`;
 }
 
-export function schemaStory({ centerLabel, parentLabels = [], childLabels = [] } = {}) {
+export function schemaStory({
+  centerLabel,
+  parentLabels = [],
+  childLabels = [],
+  hiddenRelatedCount = 0
+} = {}) {
   let s = `You're looking at ${centerLabel || "this record"}.`;
-  if (parentLabels.length) s += ` It is linked to ${joinLabels(parentLabels.slice(0, 5))}.`;
-  if (childLabels.length) s += ` These records belong to it: ${joinLabels(childLabels.slice(0, 6))}.`;
+  if (parentLabels.length) s += ` On this map it is linked to ${joinLabels(parentLabels)}.`;
+  if (childLabels.length) s += ` These tiles belong to it: ${joinLabels(childLabels)}.`;
+  if (hiddenRelatedCount > 0) {
+    s += ` ${hiddenRelatedCount} more related record types are hidden so the map stays readable. Open a linked record type to follow the rest.`;
+  }
   return s;
 }
 

@@ -39,6 +39,9 @@ import {
   pickCardFields,
   layoutSchemaGraph,
   buildGraphEdges,
+  pickMapRelatedNames,
+  edgesForVisibleCards,
+  dedupeEdgesByObjectPair,
   routeRelationshipPath,
   edgeLabelText,
   friendlyObjectKind,
@@ -227,6 +230,7 @@ const state = {
   schemaMovingCard: "",
   schemaSimpleMode: true,
   schemaLabels: {},
+  schemaHiddenRelatedCount: 0,
   schemaFieldMenu: null,
   packageSelections: [],
   packageMembersCache: [],
@@ -1264,6 +1268,7 @@ async function switchActiveSession(orgKey) {
     state.schemaExpanded = {};
     state.schemaView = { x: 0, y: 0, scale: 1 };
     state.schemaCardPositions = {};
+    state.schemaHiddenRelatedCount = 0;
     state.schemaAsUserKey = "";
     state.schemaAsUser = null;
     state.schemaAsUserOverlays = {};
@@ -2670,14 +2675,15 @@ function renderSchemaStory(describe, edge = null) {
   el.classList.remove("is-focus");
   el.textContent = schemaStory({
     centerLabel: describe.label || describe.name,
-    parentLabels: (state.schemaParents || [])
-      .map((p) => labels[p.targetObject] || p.targetObject)
-      .filter((v, i, a) => a.indexOf(v) === i)
-      .slice(0, 5),
-    childLabels: (state.schemaChildren || [])
-      .map((c) => labels[c.childObject] || c.childObject)
-      .filter((v, i, a) => a.indexOf(v) === i)
-      .slice(0, 6)
+    parentLabels: pickMapRelatedNames(
+      [...new Set((state.schemaParents || []).map((p) => p.targetObject))],
+      { limit: state.schemaSimpleMode !== false ? 4 : 6, centerName: describe.name }
+    ).map((n) => labels[n] || n),
+    childLabels: pickMapRelatedNames(
+      [...new Set((state.schemaChildren || []).map((c) => c.childObject))],
+      { limit: state.schemaSimpleMode !== false ? 6 : 8, centerName: describe.name }
+    ).map((n) => labels[n] || n),
+    hiddenRelatedCount: state.schemaHiddenRelatedCount || 0
   });
 }
 
@@ -2809,10 +2815,18 @@ function renderSchemaCanvas(describe) {
   const lines = $("#schemaLines");
   if (!cardsHost || !lines) return;
 
-  const parentNames = [...new Set((state.schemaParents || []).map((p) => p.targetObject))].slice(0, 6);
-  const childNames = [...new Set((state.schemaChildren || []).map((c) => c.childObject))]
-    .filter((n) => n !== describe.name)
-    .slice(0, 12);
+  const simple = state.schemaSimpleMode !== false;
+  const parentCap = simple ? 4 : 6;
+  const childCap = simple ? 6 : 8;
+  const allParentNames = [...new Set((state.schemaParents || []).map((p) => p.targetObject))];
+  const allChildNames = [...new Set((state.schemaChildren || []).map((c) => c.childObject))].filter(
+    (n) => n !== describe.name
+  );
+  const parentNames = pickMapRelatedNames(allParentNames, { limit: parentCap, centerName: describe.name });
+  const childNames = pickMapRelatedNames(allChildNames, { limit: childCap, centerName: describe.name });
+  state.schemaHiddenRelatedCount =
+    Math.max(0, allParentNames.length - parentNames.length) +
+    Math.max(0, allChildNames.length - childNames.length);
 
   const positions = layoutSchemaGraph({
     centerName: describe.name,
@@ -2853,12 +2867,16 @@ function renderSchemaCanvas(describe) {
 
   const labels = schemaLabelMap(describe);
   state.schemaLabels = labels;
-  state._schemaEdges = buildGraphEdges({
+  const visibleNames = [describe.name, ...parentNames, ...childNames];
+  let edges = buildGraphEdges({
     centerName: describe.name,
     parents: (state.schemaParents || []).filter((p) => parentNames.includes(p.targetObject)),
     children: (state.schemaChildren || []).filter((c) => childNames.includes(c.childObject)),
     labels
   });
+  edges = edgesForVisibleCards(edges, visibleNames);
+  if (simple) edges = dedupeEdgesByObjectPair(edges);
+  state._schemaEdges = edges;
   state._schemaLayoutOffset = { x: offsetX, y: offsetY };
 }
 
@@ -3175,24 +3193,34 @@ function openSchemaFieldMenu({ field, objectName, anchorEl, clientX, clientY }) 
   });
 }
 
-function boxForEl(el) {
+function boxForEl(el, host) {
+  if (!el) return { x: 0, y: 0, w: 0, h: 0 };
+  const origin = host || $("#schemaWorld") || $("#schemaCards");
+  const er = el.getBoundingClientRect();
+  const hr = origin.getBoundingClientRect();
+  const scale = state.schemaView?.scale || 1;
   return {
-    x: el.offsetLeft,
-    y: el.offsetTop,
-    w: el.offsetWidth,
-    h: el.offsetHeight
+    x: (er.left - hr.left) / scale,
+    y: (er.top - hr.top) / scale,
+    w: er.width / scale,
+    h: er.height / scale
   };
 }
 
 function drawSchemaLines() {
   const svg = $("#schemaLines");
   const cardsHost = $("#schemaCards");
+  const world = $("#schemaWorld");
   if (!svg || !cardsHost) return;
-  const edges = state._schemaEdges || [];
+  const simple = state.schemaSimpleMode !== false;
+  const visible = [...cardsHost.querySelectorAll(".sb-card")]
+    .map((c) => c.dataset.object)
+    .filter(Boolean);
+  const edges = edgesForVisibleCards(state._schemaEdges || [], visible);
   let maxX = 800;
   let maxY = 600;
   for (const card of cardsHost.querySelectorAll(".sb-card")) {
-    maxX = Math.max(maxX, card.offsetLeft + card.offsetWidth + 120);
+    maxX = Math.max(maxX, card.offsetLeft + card.offsetWidth + 80);
     maxY = Math.max(maxY, card.offsetTop + card.offsetHeight + 80);
   }
   svg.setAttribute("width", String(maxX));
@@ -3211,30 +3239,27 @@ function drawSchemaLines() {
     </marker>
   </defs>`;
 
-  const incoming = {};
   for (const edge of edges) {
-    incoming[edge.toObject] = (incoming[edge.toObject] || 0) + 1;
-  }
-  const incomingSeen = {};
-
-  for (const edge of edges) {
-    const fromField = cardsHost.querySelector(
-      `.sb-field[data-object="${CSS.escape(edge.fromObject)}"][data-field="${CSS.escape(edge.fromField)}"]`
-    );
-    const toCard = cardsHost.querySelector(`.sb-card[data-object="${CSS.escape(edge.toObject)}"]`);
     const fromCard = cardsHost.querySelector(`.sb-card[data-object="${CSS.escape(edge.fromObject)}"]`);
-    if (!toCard || !fromCard) continue;
-    const fromEl = fromField || fromCard;
-    incomingSeen[edge.toObject] = (incomingSeen[edge.toObject] || 0) + 1;
+    const toCard = cardsHost.querySelector(`.sb-card[data-object="${CSS.escape(edge.toObject)}"]`);
+    if (!fromCard || !toCard) continue;
+    const fromEl =
+      !simple &&
+      cardsHost.querySelector(
+        `.sb-field[data-object="${CSS.escape(edge.fromObject)}"][data-field="${CSS.escape(edge.fromField)}"]`
+      );
+    const fromBox = boxForEl(fromEl || fromCard, world);
+    const toBox = boxForEl(toCard, world);
+    if (fromBox.w < 4 || toBox.w < 4) continue;
     const route = routeRelationshipPath({
-      fromBox: boxForEl(fromEl),
-      toBox: boxForEl(toCard),
-      index: edge.spreadIndex ?? incomingSeen[edge.toObject] - 1,
-      count: edge.spreadCount || incoming[edge.toObject] || 1
+      fromBox,
+      toBox,
+      index: edge.spreadIndex || 0,
+      count: edge.spreadCount || 1
     });
     const highlighted = state.schemaHighlightedEdgeId === edge.id;
     const baseClass = edge.kind === "masterdetail" ? "sb-line sb-line-md" : "sb-line";
-    const label = edgeLabelText(edge, { simple: state.schemaSimpleMode !== false });
+    const label = edgeLabelText(edge, { simple });
 
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     group.setAttribute("class", `sb-edge${highlighted ? " is-highlight" : ""}`);

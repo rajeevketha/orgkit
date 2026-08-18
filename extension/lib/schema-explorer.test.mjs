@@ -16,6 +16,9 @@ import {
   layoutSchemaGraph,
   buildGraphEdges,
   assignEdgeSpread,
+  pickMapRelatedNames,
+  edgesForVisibleCards,
+  dedupeEdgesByObjectPair,
   routeRelationshipPath,
   edgeLabelText,
   schemaStory,
@@ -228,8 +231,44 @@ test("schemaStory and friendly access use plain language", () => {
     }),
     /You're looking at Account/
   );
+  assert.match(
+    schemaStory({
+      centerLabel: "Account",
+      parentLabels: ["User"],
+      childLabels: ["Contact"],
+      hiddenRelatedCount: 132
+    }),
+    /132 more related record types are hidden/
+  );
   assert.equal(friendlyAccessLine({ read: true, create: true, edit: true, del: false }), "You can view, create and edit these records.");
   assert.equal(edgeLabelText({ plainLabel: "belongs to User", techLabel: "Owner → User" }, { simple: true }), "belongs to User");
+});
+
+test("pickMapRelatedNames prefers everyday children over change events", () => {
+  const picked = pickMapRelatedNames(
+    ["AccountChangeEvent", "Contact", "AccountShare", "Opportunity", "AccountHistory", "Case"],
+    { limit: 3, centerName: "Account" }
+  );
+  assert.deepEqual(picked, ["Case", "Contact", "Opportunity"]);
+});
+
+test("edgesForVisibleCards drops lines whose tiles are not on the map", () => {
+  const edges = [
+    { fromObject: "Contact", toObject: "Account" },
+    { fromObject: "AccountShare", toObject: "Account" }
+  ];
+  const visible = edgesForVisibleCards(edges, ["Account", "Contact"]);
+  assert.equal(visible.length, 1);
+  assert.equal(visible[0].fromObject, "Contact");
+});
+
+test("dedupeEdgesByObjectPair keeps one line per pair", () => {
+  const out = dedupeEdgesByObjectPair([
+    { fromObject: "Job__c", toObject: "Account", fromField: "A__c" },
+    { fromObject: "Job__c", toObject: "Account", fromField: "B__c" }
+  ]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].spreadCount, 1);
 });
 
 test("assignEdgeSpread and routeRelationshipPath fan stacked links", () => {
@@ -240,19 +279,13 @@ test("assignEdgeSpread and routeRelationshipPath fan stacked links", () => {
   assert.equal(spread[0].spreadIndex, 0);
   assert.equal(spread[1].spreadIndex, 1);
   assert.equal(spread[1].spreadCount, 2);
-  const a = routeRelationshipPath({
-    fromBox: { x: 0, y: 40, w: 100, h: 20 },
-    toBox: { x: 200, y: 0, w: 100, h: 80 },
-    index: 0,
-    count: 2
-  });
-  const b = routeRelationshipPath({
-    fromBox: { x: 0, y: 60, w: 100, h: 20 },
-    toBox: { x: 200, y: 0, w: 100, h: 80 },
-    index: 1,
-    count: 2
-  });
-  assert.notEqual(a.x2, b.x2);
+  const child = { x: 40, y: 400, w: 280, h: 200 };
+  const center = { x: 200, y: 40, w: 280, h: 200 };
+  const a = routeRelationshipPath({ fromBox: child, toBox: center, index: 0, count: 2 });
+  const b = routeRelationshipPath({ fromBox: child, toBox: center, index: 1, count: 2 });
+  assert.notEqual(a.d, b.d);
+  assert.equal(a.y1, child.y);
+  assert.equal(a.y2, center.y + center.h);
   assert.match(a.d, /^M /);
   assert.equal(edgeLabelText({ label: "Owner → User" }), "Owner → User");
 });

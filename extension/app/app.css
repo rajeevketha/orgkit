@@ -1268,12 +1268,20 @@ button.linkish:hover,
   font-size: 10.5px;
   font-family: var(--font, inherit);
   pointer-events: none;
+  opacity: 0;
 }
 .sb-line-label-bg {
   fill: #102238;
   stroke: #3d5f82;
   stroke-width: 1;
   pointer-events: none;
+  opacity: 0;
+}
+.sb-edge:hover .sb-line-label,
+.sb-edge:hover .sb-line-label-bg,
+.sb-edge.is-highlight .sb-line-label,
+.sb-edge.is-highlight .sb-line-label-bg {
+  opacity: 1;
 }
 .sb-edge.is-highlight .sb-line-label-bg {
   fill: #173049;
