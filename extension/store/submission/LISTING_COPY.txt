@@ -1,6 +1,6 @@
 ================================================================================
 Chrome Web Store — OrgKit listing copy (paste into Developer Dashboard)
-Version covered: 1.8.9
+Version covered: 1.10.0
 ================================================================================
 
 LANGUAGE
@@ -14,28 +14,26 @@ CATEGORY
 SHORT DESCRIPTION  (max 132 characters — count carefully)
 ================================================================================
 
-NL→SOQL plus Session Workbench, Org Compare, schema & Apex tools. Uses your open Salesforce tab session only.
+Daily Salesforce work: Query, Schema, Compare, Apex. Uses your open tab session only.
 
-Character count: 118
+Character count: 85
 
 ================================================================================
 DETAILED DESCRIPTION
 ================================================================================
 
-OrgKit is a productivity toolkit for Salesforce developers and admins.
+OrgKit is for the Salesforce work you already do in Chrome.
 
-Signature feature — NL → SOQL
-Type what you need in plain English and OrgKit generates runnable SOQL for your open org — standard objects, custom objects (__c), custom metadata (__mdt), and Tooling entities. Generate, run, and export results without leaving the browser.
+You stay in the org you logged into. OrgKit uses that tab session — it does not ask for a password and does not store your session id.
 
-What else it does
-• Session Workbench home — quick launch (NL→SOQL first), continue recent work, pinned SOQL, per-org scratch pad
-• Org Compare — dual-org drift check for objects/fields, profiles, permission sets, flows, Apex, validation rules, and related metadata
-• SOQL / Tooling runner with field autocomplete and a saved query library
-• Open query results in Lightning; show all data to view fields; update/delete with confirmation
-• Describe browser for standard and custom objects (fields + dependent picklists)
-• Metadata quick open, package.xml builder
-• Inactive flow version cleaner (Active versions are never deleted)
-• Apex review, governor heuristics, error/log helpers, permission investigator
+Daily tools
+• Query — describe the rows in plain English, or run SOQL / Tooling
+• Schema — a map of how record types connect, plus a field describe
+• Compare — UAT vs Prod (objects, permissions, live flow versions) or any two flow versions in the same org or across two orgs
+• Apex — anonymous Apex and debug output
+• Home — continue recent work, pinned queries, a per-org scratch pad
+
+Also available under More: inactive flow versions, package.xml, permissions, metadata jump, record Ids, and heuristic scans for pasted logs/errors/Apex.
 
 How authentication works
 OrgKit does not ask you to type a password into the extension. It uses the Salesforce session cookie from a Salesforce tab you already logged into in Chrome, only to call Salesforce APIs for actions you start. The session stays in your browser. This is the same session model used by tools such as Salesforce Inspector Reloaded.
@@ -59,7 +57,7 @@ Permissions (summary)
 SINGLE PURPOSE
 ================================================================================
 
-OrgKit helps Salesforce developers work in their open org: turn plain English into SOQL (NL→SOQL), run SOQL/Tooling queries, inspect schema/metadata (including custom objects), compare drift between two logged-in orgs, review Apex/flows, and open records — using the browser Salesforce session already available in a logged-in tab.
+OrgKit lets Salesforce developers do daily work in the org already open in Chrome: query data, read schema, compare two orgs or flow versions, and run anonymous Apex — using the browser Salesforce session from a logged-in tab.
 
 ================================================================================
 PUBLIC URLS (Chrome Web Store — OrgKit)

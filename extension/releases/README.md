@@ -10,9 +10,15 @@
 **GitHub raw (this branch):**
 
 - Store: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-store.zip
-- Versioned: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-1.9.8-store.zip
+- Versioned: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-1.10.0-store.zip
 
-## Current version: 1.9.8
+## Current version: 1.10.0
+
+### 1.10.0 notes
+
+- Daily-work layout: Home, Query, Schema, Compare, Apex, More
+- Occasional paste tools stay under More (not deleted)
+- Salesforce edge tab opens Query / Schema / Compare / Apex
 
 ### 1.9.8 notes
 

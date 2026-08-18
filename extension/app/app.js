@@ -127,56 +127,43 @@ import {
 
 const FEATURES = [
   {
-    id: "nl-soql",
-    title: "NL → SOQL",
-    blurb: "Plain English → runnable SOQL / Tooling",
-    featured: true
+    id: "flow-clean",
+    title: "Inactive flow versions",
+    blurb: "Delete drafts that block field deletion. Active versions are never deleted."
   },
-  {
-    id: "schema",
-    title: "Schema Explorer",
-    blurb: "See how records connect — drag tiles, read relationships in plain language"
-  },
-  { id: "soql-run", title: "SOQL Runner", blurb: "Query standard & custom objects" },
-  { id: "anon-apex", title: "Anonymous Apex", blurb: "Run Apex and view debug output" },
-  { id: "describe", title: "Describe Browser", blurb: "Fields & dependencies for any object" },
-  {
-    id: "org-compare",
-    title: "Org Compare",
-    blurb: "UAT vs Prod drift, or any two flow versions"
-  },
-  { id: "meta-open", title: "Metadata Quick Open", blurb: "Open classes, flows, LWCs, and more" },
-  { id: "package", title: "Package.xml Builder", blurb: "Build package.xml from selected members" },
-  { id: "flow-clean", title: "Inactive Flow Cleaner", blurb: "Remove inactive versions safely" },
-  { id: "flow", title: "Flow Analyzer", blurb: "Find DML-in-loop and fault gaps" },
-  { id: "governor", title: "Governor Predictor", blurb: "Estimate Apex limit risk" },
-  { id: "errors", title: "Error Decoder", blurb: "Explain Salesforce errors" },
-  { id: "logs", title: "Debug Log Analyzer", blurb: "Limits, SOQL, and exceptions" },
-  { id: "formula", title: "Formula Builder", blurb: "Build field formulas from a description" },
-  { id: "perms", title: "Permission Investigator", blurb: "User CRUD / FLS on any object" },
-  { id: "apex", title: "Apex Review", blurb: "Security and bulkification checks" }
+  { id: "package", title: "package.xml", blurb: "Build a package.xml from members in this org" },
+  { id: "perms", title: "Permissions", blurb: "CRUD and field access for a user on one object" },
+  { id: "meta-open", title: "Open metadata", blurb: "Jump to a class, flow, LWC, or other Setup page" },
+  { id: "ids", title: "Record / ID", blurb: "Convert 15/18 character Ids and open records" },
+  { id: "flow", title: "Flow scan", blurb: "Heuristic check for DML-in-loop patterns" },
+  { id: "governor", title: "Governor estimate", blurb: "Rough limit risk from pasted Apex" },
+  { id: "errors", title: "Error decoder", blurb: "Explain a pasted Salesforce error" },
+  { id: "logs", title: "Debug log", blurb: "Summarize a pasted debug log" },
+  { id: "formula", title: "Formula helper", blurb: "Draft a formula from a description" },
+  { id: "apex", title: "Apex scan", blurb: "Heuristic security and bulkification notes" }
 ];
 
 const TITLES = {
-  home: "Session Workbench",
-  describe: "Describe Browser",
-  schema: "Schema Explorer",
-  "org-compare": "Org Compare",
-  "meta-open": "Metadata Quick Open",
-  package: "Package.xml Builder",
-  "flow-clean": "Inactive Flow Cleaner",
-  "nl-soql": "NL → SOQL",
-  flow: "Flow Analyzer",
-  governor: "Governor Predictor",
-  errors: "Error Decoder",
-  logs: "Debug Log Analyzer",
-  formula: "Formula Builder",
-  perms: "Permission Investigator",
-  apex: "Apex Review",
-  links: "Setup Links",
-  "soql-run": "SOQL Runner",
-  "anon-apex": "Anonymous Apex",
-  ids: "ID Tools",
+  home: "Home",
+  more: "More tools",
+  describe: "Describe",
+  schema: "Schema",
+  "org-compare": "Compare",
+  "meta-open": "Open metadata",
+  package: "package.xml",
+  "flow-clean": "Inactive flow versions",
+  "nl-soql": "Query",
+  flow: "Flow scan",
+  governor: "Governor estimate",
+  errors: "Error decoder",
+  logs: "Debug log",
+  formula: "Formula helper",
+  perms: "Permissions",
+  apex: "Apex scan",
+  links: "Setup links",
+  "soql-run": "SOQL runner",
+  "anon-apex": "Apex",
+  ids: "Record / ID",
   favs: "Favorites"
 };
 
@@ -354,14 +341,13 @@ async function applyShellMode() {
 
 function renderFeatureGrid() {
   const grid = $("#featureGrid");
+  if (!grid) return;
   grid.innerHTML = "";
   FEATURES.forEach((f) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = f.featured ? "feature-card feature-card-featured" : "feature-card";
-    btn.innerHTML = f.featured
-      ? `<span class="feature-card-badge">Signature</span><strong>${f.title}</strong><span>${f.blurb}</span>`
-      : `<strong>${f.title}</strong><span>${f.blurb}</span>`;
+    btn.className = "feature-card";
+    btn.innerHTML = `<strong>${f.title}</strong><span>${f.blurb}</span>`;
     btn.addEventListener("click", () => showView(f.id));
     grid.appendChild(btn);
   });
@@ -396,12 +382,30 @@ function bindNav() {
   });
 }
 
+function navKeyForView(id) {
+  if (id === "home") return "home";
+  if (id === "nl-soql" || id === "soql-run") return "nl-soql";
+  if (id === "schema" || id === "describe") return "schema";
+  if (id === "org-compare") return "org-compare";
+  if (id === "anon-apex") return "anon-apex";
+  return "more";
+}
+
+function syncAppNav(id) {
+  const key = navKeyForView(id);
+  document.querySelectorAll(".app-nav-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.getAttribute("data-nav") === key);
+  });
+  const title = TITLES[id] || "OrgKit";
+  document.title = id === "home" ? "OrgKit" : `${title} · OrgKit`;
+}
+
 function showView(id) {
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
   const el = $(`#view-${id}`);
   if (el) el.classList.add("active");
-  $("#headerTitle").textContent = TITLES[id] || "OrgKit";
-  $("#backBtn").classList.toggle("hidden", id === "home");
+  syncAppNav(id);
+  $("#backBtn")?.classList.toggle("hidden", id === "home");
   if (id === "home") {
     refreshWorkbench().catch(() => {});
   }

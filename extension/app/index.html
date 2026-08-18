@@ -9,11 +9,19 @@
 </head>
 <body>
   <header class="header">
-    <button type="button" class="icon-btn hidden" id="backBtn" title="Back">←</button>
-    <div class="brand">
+    <button type="button" class="icon-btn hidden" id="backBtn" title="Home">←</button>
+    <button type="button" class="brand brand-home" data-open="home" title="Home">
       <img src="../icons/icon32.png" alt="" width="20" height="20" />
-      <span id="headerTitle">OrgKit</span>
-    </div>
+      <span>OrgKit</span>
+    </button>
+    <nav class="app-nav" aria-label="Daily work">
+      <button type="button" class="app-nav-btn" data-nav="home" data-open="home">Home</button>
+      <button type="button" class="app-nav-btn" data-nav="nl-soql" data-open="nl-soql">Query</button>
+      <button type="button" class="app-nav-btn" data-nav="schema" data-open="schema">Schema</button>
+      <button type="button" class="app-nav-btn" data-nav="org-compare" data-open="org-compare">Compare</button>
+      <button type="button" class="app-nav-btn" data-nav="anon-apex" data-open="anon-apex">Apex</button>
+      <button type="button" class="app-nav-btn" data-nav="more" data-open="more">More</button>
+    </nav>
     <button type="button" class="icon-btn" id="openOptions" title="Settings">⚙</button>
   </header>
 
@@ -32,25 +40,32 @@
 
   <!-- SESSION WORKBENCH (home) -->
   <section id="view-home" class="view active">
-    <p class="lede">Session Workbench — opens on the Salesforce org you launched from; use Active session to switch when multiple orgs are open.</p>
+    <p class="lede">Work in the Salesforce org already open in Chrome. Switch Active session when you have more than one tab.</p>
 
-    <button type="button" class="nl-spotlight" data-open="nl-soql" id="nlSpotlight">
-      <span class="nl-spotlight-kicker">Signature feature</span>
-      <strong class="nl-spotlight-title">NL → SOQL</strong>
-      <span class="nl-spotlight-blurb">Describe what you need in plain English — OrgKit writes the SOQL (standard, custom, CMDT, or Tooling).</span>
-      <span class="nl-spotlight-cta">Try NL → SOQL</span>
-    </button>
-
-    <div class="wb-launch" id="wbLaunch">
-      <button type="button" class="btn primary" data-open="nl-soql">NL → SOQL</button>
-      <button type="button" class="btn" data-open="schema">Schema</button>
-      <button type="button" class="btn" data-open="soql-run">SOQL</button>
-      <button type="button" class="btn" data-open="anon-apex">Anon Apex</button>
+    <div class="daily-grid" id="wbLaunch">
+      <button type="button" class="daily-card" data-open="nl-soql">
+        <strong>Query</strong>
+        <span>Ask in English or run SOQL against this org</span>
+      </button>
+      <button type="button" class="daily-card" data-open="schema">
+        <strong>Schema</strong>
+        <span>See how record types connect</span>
+      </button>
+      <button type="button" class="daily-card" data-open="org-compare">
+        <strong>Compare</strong>
+        <span>UAT vs Prod, or any two flow versions</span>
+      </button>
+      <button type="button" class="daily-card" data-open="anon-apex">
+        <strong>Apex</strong>
+        <span>Run anonymous Apex and read the debug log</span>
+      </button>
+    </div>
+    <div class="daily-row">
+      <button type="button" class="btn" data-open="soql-run">SOQL runner</button>
       <button type="button" class="btn" data-open="describe">Describe</button>
-      <button type="button" class="btn" data-open="org-compare">Org Compare</button>
-      <button type="button" class="btn" data-open="meta-open">Metadata</button>
-      <button type="button" class="btn" data-open="logs">Debug logs</button>
+      <button type="button" class="btn" data-open="meta-open">Open metadata</button>
       <button type="button" class="btn" data-open="ids">Record / ID</button>
+      <button type="button" class="btn ghost" data-open="more">More tools</button>
     </div>
 
     <div class="wb-grid">
@@ -59,7 +74,7 @@
           <h3>Continue</h3>
           <button type="button" class="linkish" id="wbClearContinue" title="Clear continue list">Clear</button>
         </div>
-        <p class="hint wb-hint">Recent SOQL, Apex, describe, and metadata actions for this org (local only).</p>
+        <p class="hint wb-hint">Recent work in this org (saved in this browser only).</p>
         <div id="wbContinue" class="wb-list"></div>
       </div>
       <div class="wb-card">
@@ -91,21 +106,6 @@
       </div>
     </div>
 
-    <details class="wb-tools" id="wbAllTools">
-      <summary>All tools</summary>
-      <div class="feature-grid" id="featureGrid"></div>
-      <div class="extras">
-        <div class="label" style="margin-top:0">Quick links &amp; utilities</div>
-        <div class="util-row">
-          <button type="button" class="btn" data-open="links">Setup links</button>
-          <button type="button" class="btn" data-open="soql-run">SOQL runner</button>
-          <button type="button" class="btn" data-open="anon-apex">Anonymous Apex</button>
-          <button type="button" class="btn" data-open="ids">ID tools</button>
-          <button type="button" class="btn" data-open="favs">Favorites</button>
-        </div>
-      </div>
-    </details>
-
     <div class="trust-card">
       <strong>Privacy &amp; data access</strong>
       <ul>
@@ -121,11 +121,28 @@
     </div>
   </section>
 
+  <section id="view-more" class="view">
+    <p class="lede">Occasional tools. Daily work is Query, Schema, Compare, and Apex.</p>
+    <div class="feature-grid" id="featureGrid"></div>
+    <div class="extras">
+      <div class="label" style="margin-top:0">Utilities</div>
+      <div class="util-row">
+        <button type="button" class="btn" data-open="links">Setup links</button>
+        <button type="button" class="btn" data-open="favs">Favorites</button>
+        <button type="button" class="btn" data-open="ids">Record / ID</button>
+        <button type="button" class="btn" data-open="flow-clean">Inactive flow versions</button>
+        <button type="button" class="btn" data-open="package">package.xml</button>
+      </div>
+    </div>
+  </section>
+
   <!-- FEATURE: NL SOQL -->
   <section id="view-nl-soql" class="view">
-    <p class="lede nl-view-lede">
-      OrgKit’s standout tool — type a request in plain English and get runnable SOQL for this org.
-    </p>
+    <div class="subnav" role="tablist" aria-label="Query">
+      <button type="button" class="subnav-btn active" data-open="nl-soql">Plain English</button>
+      <button type="button" class="subnav-btn" data-open="soql-run">SOQL runner</button>
+    </div>
+    <p class="lede nl-view-lede">Describe the rows you need. OrgKit writes SOQL for this org and can run it.</p>
     <div class="nl-examples" id="nlExamples" aria-label="Example prompts">
       <button type="button" class="nl-chip" data-nl-example="Accounts created this week with their owner name">Accounts this week + owner</button>
       <button type="button" class="nl-chip" data-nl-example="Open Cases for high priority with Account Name">High-priority Cases</button>
@@ -246,6 +263,10 @@
 
   <!-- FEATURE: Describe Browser -->
   <section id="view-describe" class="view">
+    <div class="subnav" role="tablist" aria-label="Schema">
+      <button type="button" class="subnav-btn" data-open="schema">Map</button>
+      <button type="button" class="subnav-btn active" data-open="describe">Field list</button>
+    </div>
     <div class="row" style="position:relative">
       <div class="soql-editor grow" style="flex:1;min-width:0">
         <input type="search" id="describeObjectSearch" class="input grow" list="describeObjectList" placeholder="Search standard or custom object…" autocomplete="off" style="width:100%" />
@@ -264,6 +285,10 @@
 
   <!-- FEATURE: Schema Explorer -->
   <section id="view-schema" class="view">
+    <div class="subnav" role="tablist" aria-label="Schema">
+      <button type="button" class="subnav-btn active" data-open="schema">Map</button>
+      <button type="button" class="subnav-btn" data-open="describe">Field list</button>
+    </div>
     <p class="lede">
       A map of your Salesforce records — each tile is one type of record, and lines show how they connect.
       Drag any tile to move just that tile. Switch to <strong>Technical</strong> for API names and SOQL.
@@ -543,6 +568,10 @@
 
   <!-- UTIL: SOQL runner + saved library -->
   <section id="view-soql-run" class="view">
+    <div class="subnav" role="tablist" aria-label="Query">
+      <button type="button" class="subnav-btn" data-open="nl-soql">Plain English</button>
+      <button type="button" class="subnav-btn active" data-open="soql-run">SOQL runner</button>
+    </div>
     <div class="row wrap" style="margin-bottom:8px">
       <label class="label tight" for="soqlApiMode">API</label>
       <select id="soqlApiMode" class="select" title="Standard data objects or Tooling API metadata objects">

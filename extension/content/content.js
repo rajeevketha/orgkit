@@ -156,10 +156,13 @@
     panel.className = "orgkit-side-panel";
     panel.hidden = true;
     panel.innerHTML = `
-      <button type="button" data-action="orgkit">Open OrgKit</button>
+      <button type="button" data-action="orgkit">Home</button>
+      <button type="button" data-action="query">Query</button>
+      <button type="button" data-action="schema">Schema</button>
+      <button type="button" data-action="compare">Compare</button>
+      <button type="button" data-action="apex">Apex</button>
       <button type="button" data-action="setup">Setup</button>
       <button type="button" data-action="objects">Objects</button>
-      <button type="button" data-action="logs">Logs</button>
       <button type="button" data-action="flows">Flows</button>
       <button type="button" data-action="console">Console</button>
       <button type="button" data-action="minimize" class="orgkit-muted">Hide</button>
@@ -247,8 +250,15 @@
       await setMinimized(true);
       return;
     }
-    if (action === "orgkit") {
-      await openOrgKit();
+    const orgKitViews = {
+      orgkit: "",
+      query: "nl-soql",
+      schema: "schema",
+      compare: "org-compare",
+      apex: "anon-apex"
+    };
+    if (Object.prototype.hasOwnProperty.call(orgKitViews, action)) {
+      await openOrgKit(orgKitViews[action] || undefined);
       togglePanel(false);
       return;
     }
@@ -259,14 +269,20 @@
     }
   }
 
-  async function openOrgKit() {
+  async function openOrgKit(view) {
     try {
-      const res = await chrome.runtime.sendMessage({ type: "openOrgKit" });
+      const res = await chrome.runtime.sendMessage({ type: "openOrgKit", view });
       if (res?.ok === false) throw new Error(res.error || "Could not open OrgKit");
     } catch (err) {
-      // Fallback when service worker is asleep / message fails
       try {
-        window.open(chrome.runtime.getURL("app/index.html"), "_blank", "noopener");
+        const params = new URLSearchParams();
+        if (view) params.set("view", view);
+        const qs = params.toString();
+        window.open(
+          chrome.runtime.getURL("app/index.html") + (qs ? `?${qs}` : ""),
+          "_blank",
+          "noopener"
+        );
       } catch {
         console.warn("OrgKit open failed", err);
       }

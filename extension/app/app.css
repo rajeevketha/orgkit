@@ -103,6 +103,7 @@ html.shell-wide .link-list {
 .header {
   flex: 0 0 auto;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 10px 14px 8px;
@@ -116,9 +117,100 @@ html.shell-wide .link-list {
   align-items: center;
   gap: 8px;
   font-weight: 700;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   color: var(--text);
+}
+button.brand-home {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.app-nav-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 650;
+  font-size: 12.5px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.app-nav-btn:hover { color: var(--text); }
+.app-nav-btn.active {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+.subnav {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.subnav-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.subnav-btn:hover { color: var(--text); }
+.subnav-btn.active {
+  color: var(--text);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.daily-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 0 10px;
+}
+@media (max-width: 720px) {
+  .daily-grid { grid-template-columns: 1fr; }
+}
+.daily-card {
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 14px 14px 14px 16px;
+  cursor: pointer;
+  font: inherit;
+  min-height: 88px;
+}
+.daily-card:hover { border-color: var(--accent); }
+.daily-card strong {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+.daily-card span {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.daily-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
 }
 
 .brand img {

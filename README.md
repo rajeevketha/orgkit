@@ -1,62 +1,42 @@
 # OrgKit
 
-Chrome extension for Salesforce developers — **NL → SOQL**, Session Workbench, dual-org **Org Compare**, SOQL/Apex/schema tools, and Setup utilities.
+Chrome extension for Salesforce developers. Work in the org **already open in Chrome** — Query, Schema, Compare, Apex. No extra login. Session id is never stored.
 
 ## Version
 
-**1.9.0**
+**1.10.0**
 
-## Features
+## Daily work
 
-### NL → SOQL (signature)
-- Plain English → runnable SOQL for standard, custom, CMDT, and Tooling
-- Featured on the Session Workbench home with example prompts
+- **Query** — plain English → SOQL, or the SOQL runner
+- **Schema** — relationship map + field describe
+- **Compare** — UAT vs Prod inventories, live flow versions, or any two flow versions (same org or two orgs)
+- **Apex** — anonymous Apex + debug output
+- **Home** — continue recent work, pinned queries, per-org scratch pad
 
-### Schema Explorer
-- Parent/child relationship map for **standard**, **custom (`__c`)**, and **custom metadata (`__mdt`)**
-- Click to hop objects; query this object, parent-path SOQL, child subqueries; jump to Describe or NL → SOQL
+The Salesforce edge tab opens the same four tools. Active session switches among logged-in orgs.
 
-### Session Workbench (home)
-- Quick launch: **NL → SOQL** · **Schema** · SOQL · Anon Apex · Describe · **Org Compare** · Metadata · Debug logs · Record/ID
-- Continue / pinned SOQL / per-org scratch pad (local storage, no `sid`)
+## Also included (More)
 
-### Org Compare
-- A/B org cards + session chooser across all Chrome windows/tabs / cookie sessions
-- Multi-category compare: objects/fields, profiles, permission sets, flows, Apex, validation rules, record types, Lightning pages, LWC
-- Common-pack presets, category filters, side-by-side diffs
-- Remembers last A/B pair by org key only (never `sid`)
-
-### Also included
-Describe Browser, Metadata Quick Open, Package.xml Builder, Inactive Flow Cleaner, Flow/Governor/Error/Log tools, Formula builder, Permission investigator, Apex review, Setup links, ID tools, favorites.
+Inactive flow versions, package.xml, permissions, metadata jump, record/ID tools, and heuristic scans (flow/governor/error/log/formula/Apex). Those stay available; they are not the home screen.
 
 ## Install (unpacked)
 
-1. Download [`extension/releases/OrgKit-store.zip`](extension/releases/OrgKit-store.zip) (always current) and unzip
+1. Download [`extension/releases/OrgKit-store.zip`](extension/releases/OrgKit-store.zip) and unzip
 2. Chrome → `chrome://extensions` → Developer mode → **Load unpacked**
-3. Open logged-in Salesforce tabs
-4. Alt+Shift+O (or click the OrgKit icon / on-page launcher)
-
-## Chrome Web Store
-
-- **Default upload zip:** [`extension/releases/OrgKit-store.zip`](extension/releases/OrgKit-store.zip)
-- Versioned: [`extension/releases/OrgKit-1.9.0-store.zip`](extension/releases/OrgKit-1.9.0-store.zip)
-- Rebuild: `bash extension/scripts/pack-release.sh`
-- Listing URLs: [`extension/store/submission/STORE_LISTING_URLS.txt`](extension/store/submission/STORE_LISTING_URLS.txt)
-- Permission paste text: [`extension/store/submission/PERMISSION_JUSTIFICATIONS.txt`](extension/store/submission/PERMISSION_JUSTIFICATIONS.txt)
-
-## Public site (OrgKit URLs)
-
-After renaming this GitHub repo to **orgkit** and enabling Pages:
-
-- Site: https://rajeevketha.github.io/orgkit/
-- Privacy: https://rajeevketha.github.io/orgkit/privacy.html
+3. Open a logged-in Salesforce tab
+4. Alt+Shift+O, the toolbar icon, or the OrgKit tab on the right edge of the page
 
 ## Privacy
 
-- Uses open Salesforce tab / cookie sessions in the browser only
+- Uses the Salesforce session already in the browser
 - Never stores `sid`
-- Public site: https://rajeevketha.github.io/orgkit/
-- Public policy: https://rajeevketha.github.io/orgkit/privacy.html
+- Policy: https://rajeevketha.github.io/orgkit/privacy.html
+
+## Chrome Web Store pack
+
+- Upload zip: [`extension/releases/OrgKit-store.zip`](extension/releases/OrgKit-store.zip)
+- Rebuild: `bash extension/scripts/pack-release.sh`
 
 ## License
 
