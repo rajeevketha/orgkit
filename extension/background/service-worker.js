@@ -13,15 +13,19 @@ import { METADATA_SEARCH_TYPES } from "../lib/metadata-open.js";
 import { PACKAGE_TYPES } from "../lib/package-xml.js";
 import {
   buildInactiveFlowsQuery,
+  buildActiveFlowsQuery,
   flowMatchesNeedle,
   summarizeFlowVersion,
+  indexActiveFlowVersions,
+  applyActiveVersionsToFlowItems,
   INACTIVE_FLOW_STATUSES
 } from "../lib/flow-cleaner.js";
 import {
   filterGlobalObjects,
   normalizeObjectDescribe,
   isCustomObjectName,
-  defaultCompareCategoryIds
+  defaultCompareCategoryIds,
+  FLOW_COMPARE_ATTR_KEYS
 } from "../lib/org-compare.js";
 
 chrome.runtime.onInstalled.addListener((details) => {
@@ -109,7 +113,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     executeAnonymous: () => executeAnonymous(message.tabUrl, message.apex, message.apiVersion),
     fetchLatestApexDebug: () => fetchLatestApexDebug(message.tabUrl, message.apiVersion),
     getExtensionVersion: async () => ({
-      version: "1.9.6",
+      version: "1.9.7",
       hasSearchMetadata: typeof searchMetadata === "function",
       hasFlowCleaner: typeof listInactiveFlowVersions === "function",
       hasExecuteAnonymous: typeof executeAnonymous === "function",
@@ -1147,13 +1151,19 @@ async function fetchCompareBundle(tabUrl, options = {}) {
         "flows",
         "Flows",
         "Flow",
-        ["label", "processType", "triggerType", "isActive"],
+        FLOW_COMPARE_ATTR_KEYS,
         async () => {
+          const errors = [];
+          let items = {};
+          let scanned = 0;
+          let truncated = false;
+
           try {
             const q =
               "SELECT ApiName, Label, ProcessType, TriggerType, IsActive, LastModifiedDate FROM FlowDefinitionView ORDER BY ApiName ASC";
             const page = await queryAllRecords(session, q, { tooling: false, apiVersion, maxRows });
-            const items = {};
+            scanned = page.records.length;
+            truncated = !!page.truncated;
             for (const r of page.records) {
               const name = String(r.ApiName || "").trim();
               if (!name) continue;
@@ -1166,37 +1176,61 @@ async function fetchCompareBundle(tabUrl, options = {}) {
                   label: r.Label || "",
                   processType: r.ProcessType || "",
                   triggerType: r.TriggerType || "",
-                  isActive: r.IsActive ? "yes" : "no",
-                  lastModifiedDate: shortDate(r.LastModifiedDate)
+                  isActive: r.IsActive ? "yes" : "no"
                 }
               };
             }
-            return { items, scanned: page.records.length, truncated: page.truncated };
           } catch {
-            // Older orgs / permissions: Tooling FlowDefinition fallback (no IsActive).
-            const q =
-              "SELECT Id, DeveloperName, MasterLabel, NamespacePrefix, LastModifiedDate FROM FlowDefinition ORDER BY DeveloperName ASC";
-            const page = await queryAllRecords(session, q, { tooling: true, apiVersion, maxRows });
-            const items = {};
-            for (const r of page.records) {
-              const name = memberName(r.NamespacePrefix, r.DeveloperName);
-              if (!name) continue;
-              items[name] = {
-                name,
-                label: r.MasterLabel || name,
-                custom: true,
-                packageMember: name,
-                attrs: {
-                  label: r.MasterLabel || "",
-                  processType: "",
-                  triggerType: "",
-                  isActive: "—",
-                  lastModifiedDate: shortDate(r.LastModifiedDate)
-                }
-              };
+            try {
+              const q =
+                "SELECT Id, DeveloperName, MasterLabel, NamespacePrefix, LastModifiedDate FROM FlowDefinition ORDER BY DeveloperName ASC";
+              const page = await queryAllRecords(session, q, { tooling: true, apiVersion, maxRows });
+              scanned = page.records.length;
+              truncated = !!page.truncated;
+              for (const r of page.records) {
+                const name = memberName(r.NamespacePrefix, r.DeveloperName);
+                if (!name) continue;
+                items[name] = {
+                  name,
+                  label: r.MasterLabel || name,
+                  custom: true,
+                  packageMember: name,
+                  attrs: {
+                    label: r.MasterLabel || "",
+                    processType: "",
+                    triggerType: "",
+                    isActive: "—"
+                  }
+                };
+              }
+            } catch (e) {
+              errors.push({ error: e.message || String(e) });
             }
-            return { items, scanned: page.records.length, truncated: page.truncated };
           }
+
+          try {
+            let page;
+            try {
+              page = await queryAllRecords(session, buildActiveFlowsQuery({ includeNamespace: true }), {
+                tooling: true,
+                apiVersion,
+                maxRows
+              });
+            } catch {
+              page = await queryAllRecords(session, buildActiveFlowsQuery({ includeNamespace: false }), {
+                tooling: true,
+                apiVersion,
+                maxRows
+              });
+            }
+            items = applyActiveVersionsToFlowItems(items, indexActiveFlowVersions(page.records));
+            truncated = truncated || !!page.truncated;
+          } catch (e) {
+            errors.push({ error: `Active flow versions: ${e.message || String(e)}` });
+            items = applyActiveVersionsToFlowItems(items, {});
+          }
+
+          return { items, scanned, truncated, errors };
         }
       )
     );

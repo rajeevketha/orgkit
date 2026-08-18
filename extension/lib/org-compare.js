@@ -407,7 +407,7 @@ export const COMPARE_CATEGORIES = [
   {
     id: "flows",
     label: "Flows",
-    blurb: "Flow definitions + active flag",
+    blurb: "Which flows exist, whether they are active, and which version is live",
     metadataType: "Flow",
     defaultOn: true,
     common: true
@@ -474,6 +474,29 @@ export function commonCompareCategoryIds() {
   return COMPARE_CATEGORIES.filter((c) => c.common).map((c) => c.id);
 }
 
+/** Attribute keys used when diffing the Flows category (active version first). */
+export const FLOW_COMPARE_ATTR_KEYS = ["activeVersion", "isActive", "processType", "triggerType"];
+
+const COMPARE_ATTR_LABELS = {
+  activeVersion: "Active version",
+  isActive: "Active",
+  processType: "Process type",
+  triggerType: "Trigger type",
+  lastModifiedDate: "Last modified",
+  apiVersion: "API version",
+  lengthWithoutComments: "Size",
+  tableEnumOrId: "Object",
+  namespace: "Namespace",
+  isCustom: "Custom",
+  description: "Description",
+  status: "Status",
+  label: "Label"
+};
+
+export function compareAttrLabel(key) {
+  return COMPARE_ATTR_LABELS[key] || key;
+}
+
 function namedAttrRows(left, right, keys) {
   const rows = [];
   for (const key of keys || []) {
@@ -482,7 +505,7 @@ function namedAttrRows(left, right, keys) {
     const aVal = a == null || a === "" ? "—" : String(a);
     const bVal = b == null || b === "" ? "—" : String(b);
     if (aVal === bVal) continue;
-    rows.push({ label: key, left: aVal, right: bVal });
+    rows.push({ key, label: compareAttrLabel(key), left: aVal, right: bVal });
   }
   return rows;
 }

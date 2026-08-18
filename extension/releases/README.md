@@ -10,9 +10,14 @@
 **GitHub raw (this branch):**
 
 - Store: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-store.zip
-- Versioned: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-1.9.6-store.zip
+- Versioned: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-1.9.7-store.zip
 
-## Current version: 1.9.6
+## Current version: 1.9.7
+
+### 1.9.7 notes
+
+- Org Compare can diff **which flow version is live** in two orgs (UAT vs Prod)
+- Preset: Active flow versions — same A/B sessions, no extra login
 
 ### 1.9.6 notes
 

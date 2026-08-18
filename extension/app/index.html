@@ -335,9 +335,9 @@
   <!-- FEATURE: Org Compare -->
   <section id="view-org-compare" class="view">
     <p class="hint">
-      Compare custom object and field inventory between two logged-in Salesforce orgs (UAT vs Prod drift).
-      OrgKit scans <strong>all Chrome windows</strong> in this profile for Salesforce tabs, plus cookie sessions.
-      No passwords; <code>sid</code> is never stored. Last A/B pair is remembered by org key only.
+      Compare two logged-in Salesforce orgs (UAT vs Prod). Pick what to scan — objects, profiles, perm sets,
+      <strong>active flow versions</strong>, Apex, and more.
+      OrgKit uses tabs and cookie sessions in this Chrome profile. No passwords; <code>sid</code> is never stored.
     </p>
 
     <div class="compare-chooser">
@@ -381,6 +381,7 @@
         <div class="label" style="margin-top:0">What to compare</div>
         <div class="row wrap compare-cat-presets">
           <button type="button" class="btn" id="compareCatsCommon" title="Objects, profiles, perm sets, flows, Apex, validation rules">Common pack</button>
+          <button type="button" class="btn" id="compareCatsFlows" title="Only compare which flow version is live in each org">Active flow versions</button>
           <button type="button" class="btn" id="compareCatsAll">Select all</button>
           <button type="button" class="btn" id="compareCatsNone">Clear</button>
         </div>
@@ -459,6 +460,8 @@
       Inactive flow versions (Draft / Obsolete / InvalidDraft) often block field deletion.
       Load them, optionally filter by field API name, then delete selected versions.
       <strong>Active versions are never deleted.</strong>
+      To see whether sandbox and production are on the same live version, use
+      <button type="button" class="linkish" id="openFlowVersionCompare">Org Compare → Active flow versions</button>.
     </p>
     <label class="label" for="flowCleanObject">Object API (optional)</label>
     <input id="flowCleanObject" class="input" placeholder="MyObject__c" />

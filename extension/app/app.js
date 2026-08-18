@@ -115,7 +115,8 @@ import {
   loadLastComparePair,
   COMPARE_CATEGORIES,
   defaultCompareCategoryIds,
-  commonCompareCategoryIds
+  commonCompareCategoryIds,
+  compareAttrLabel
 } from "../lib/org-compare.js";
 
 const FEATURES = [
@@ -136,7 +137,7 @@ const FEATURES = [
   {
     id: "org-compare",
     title: "Org Compare",
-    blurb: "UAT vs Prod custom object & field drift"
+    blurb: "UAT vs Prod — objects, fields, and which flow version is live"
   },
   { id: "meta-open", title: "Metadata Quick Open", blurb: "Open classes, flows, LWCs, and more" },
   { id: "package", title: "Package.xml Builder", blurb: "Build package.xml from selected members" },
@@ -643,6 +644,11 @@ function bindFeatureActions() {
 
   $("#loadInactiveFlows").addEventListener("click", () => onLoadInactiveFlows(false));
   $("#scanFlowFieldRefs").addEventListener("click", () => onLoadInactiveFlows(true));
+  $("#openFlowVersionCompare")?.addEventListener("click", () => {
+    state.orgCompare.selectedCategories = ["flows"];
+    showView("org-compare");
+    renderCompareCategoryPicker();
+  });
   $("#flowCleanFilter").addEventListener("input", () => renderInactiveFlows());
   $("#selectAllInactiveFlows").addEventListener("click", () => {
     state.inactiveFlowSelected = state.inactiveFlows.filter((f) => f.canDelete).map((f) => f.id);
@@ -681,6 +687,10 @@ function bindFeatureActions() {
   });
   $("#compareCatsCommon")?.addEventListener("click", () => {
     state.orgCompare.selectedCategories = commonCompareCategoryIds();
+    renderCompareCategoryPicker();
+  });
+  $("#compareCatsFlows")?.addEventListener("click", () => {
+    state.orgCompare.selectedCategories = ["flows"];
     renderCompareCategoryPicker();
   });
   $("#compareCatsAll")?.addEventListener("click", () => {
@@ -4371,7 +4381,7 @@ function renderNamedDetail(detail) {
   const entries = Object.entries(detail || {}).filter(([, v]) => v != null && String(v) !== "");
   if (!entries.length) return "";
   return `<div class="compare-named-detail">${entries
-    .map(([k, v]) => `<span><em>${escapeHtml(k)}</em> ${escapeHtml(String(v))}</span>`)
+    .map(([k, v]) => `<span><em>${escapeHtml(compareAttrLabel(k))}</em> ${escapeHtml(String(v))}</span>`)
     .join("")}</div>`;
 }
 
