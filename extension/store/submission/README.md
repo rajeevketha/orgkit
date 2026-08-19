@@ -1,9 +1,9 @@
-# OrgKit Chrome Web Store submission pack (v1.11.0)
+# OrgKit Chrome Web Store submission pack (v1.12.0)
 
 | Item | File |
 |---|---|
 | **Upload zip (default)** | `../releases/OrgKit-store.zip` |
-| Versioned upload zip | `../releases/OrgKit-1.11.0-store.zip` |
+| Versioned upload zip | `../releases/OrgKit-1.12.0-store.zip` |
 | Checklist | `SUBMIT_CHECKLIST.md` |
 | Listing copy | `LISTING_COPY.txt` |
 | Permission justifications | `PERMISSION_JUSTIFICATIONS.txt` |
@@ -21,8 +21,8 @@ Start with `SUBMIT_CHECKLIST.md`.
 
 ## Important
 
-- Upload **`OrgKit-store.zip`** (or `OrgKit-1.11.0-store.zip`) only — `manifest.json` at the **root** of the zip.
+- Upload **`OrgKit-store.zip`** (or `OrgKit-1.12.0-store.zip`) only — `manifest.json` at the **root** of the zip.
 - Do **not** upload the whole repo or a zip that contains a nested `extension/` folder.
 - Privacy policy must be a **public HTTPS** URL that opens in Incognito.
 - Public listing must say **OrgKit** — use URLs from `STORE_LISTING_URLS.txt`.
-- UI is the light Lightning / Flow theme (white canvas, Salesforce blue). Confirm screenshots match the zip.
+- UI is the OrgFlow dark theme with the abstract K icon. Confirm screenshots match the zip.

@@ -10,9 +10,15 @@
 **GitHub raw (this branch):**
 
 - Store: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-store.zip
-- Versioned: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-1.11.0-store.zip
+- Versioned: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-1.12.0-store.zip
 
-## Current version: 1.11.0
+## Current version: 1.12.0
+
+### 1.12.0 notes
+
+- OrgFlow dark theme (GitHub canvas, white type, muted blue accent)
+- Abstract K mark as the extension icon and in-app wordmark
+- Same four-tool Home as 1.11.0
 
 ### 1.11.0 notes
 

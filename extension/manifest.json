@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OrgKit",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "Query, schema, compare, and Apex in the Salesforce org already open in Chrome. Uses your tab session only.",
   "icons": {
     "16": "icons/icon16.png",

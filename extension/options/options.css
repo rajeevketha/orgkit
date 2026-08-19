@@ -1,13 +1,14 @@
 :root {
-  --bg: #f3f3f3;
-  --card: #ffffff;
-  --border: #c9c9c9;
-  --text: #181818;
-  --muted: #706e6b;
-  --accent: #0176d3;
-  --danger: #ba0517;
-  --ink: #032d60;
-  --font: "Salesforce Sans", "Segoe UI", sans-serif;
+  color-scheme: dark;
+  --bg: #0d1117;
+  --card: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --danger: #f85149;
+  --ink: #f0f6fc;
+  --font: "Inter", "Segoe UI", system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -50,7 +51,6 @@ header p {
   border-radius: 12px;
   padding: 18px 20px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(24, 24, 24, 0.08);
 }
 
 h2 {
@@ -79,7 +79,7 @@ select {
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: #ffffff;
+  background: #0d1117;
   color: var(--text);
   font: inherit;
 }
@@ -91,7 +91,7 @@ select {
 
 .btn {
   border: 1px solid var(--border);
-  background: #ffffff;
+  background: #21262d;
   color: var(--ink);
   border-radius: 8px;
   padding: 8px 12px;
@@ -101,8 +101,8 @@ select {
 }
 
 .btn.danger {
-  border-color: #f4b6b1;
-  background: #fce8e6;
+  border-color: rgba(248, 81, 73, 0.55);
+  background: rgba(248, 81, 73, 0.16);
   color: var(--danger);
 }
 
@@ -113,7 +113,7 @@ select {
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: #ffffff;
+  background: #0d1117;
   color: var(--text);
   font: inherit;
 }
@@ -128,5 +128,7 @@ label[for="aiModel"] {
 
 .status {
   min-height: 1.2em;
-  color: #2e844a;
+  color: #3fb950;
 }
+
+a { color: var(--accent); }

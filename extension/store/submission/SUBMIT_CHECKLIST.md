@@ -1,12 +1,12 @@
-# OrgKit — Chrome Web Store submit checklist (v1.11.0)
+# OrgKit — Chrome Web Store submit checklist (v1.12.0)
 
 ## 1. Upload package (required)
 
-- [ ] Upload **`OrgKit-store.zip`** (or `OrgKit-1.11.0-store.zip`) — manifest at zip root
-- [ ] Confirm version **1.11.0**
+- [ ] Upload **`OrgKit-store.zip`** (or `OrgKit-1.12.0-store.zip`) — manifest at zip root
+- [ ] Confirm version **1.12.0**
 - [ ] Confirm permissions: **cookies** + **storage** + **tabs** (+ Salesforce hosts; OpenAI optional)
 - [ ] Confirm UI entry is `app/index.html`
-- [ ] Light Lightning / Flow theme (white cards, `#0176d3`) — not the old dark navy console
+- [ ] Dark OrgFlow theme + abstract K icon
 
 ## 2. Store listing (required)
 

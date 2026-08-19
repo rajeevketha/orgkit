@@ -1,5 +1,5 @@
 ================================================================================
-Notes for Chrome Web Store reviewers — OrgKit 1.11.0
+Notes for Chrome Web Store reviewers — OrgKit 1.12.0
 ================================================================================
 
 Single purpose
@@ -31,7 +31,7 @@ Does NOT request activeTab or scripting.
 UI entry point
 --------------
 Full-tab UI: app/index.html (legacy popup/popup.html redirects here).
-Light Lightning / Flow theme (white cards, Salesforce blue). Home highlights the
+OrgFlow dark theme (GitHub canvas). Abstract K mark. Home highlights the
 four daily tools.
 
 Privacy policy
