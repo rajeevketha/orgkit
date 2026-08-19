@@ -4,35 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>OrgKit — Salesforce developer toolkit</title>
-  <meta name="description" content="OrgKit is a Chrome extension for Salesforce developers: Session Workbench, Org Compare, SOQL, schema, Apex, and more. Uses your open org tab session in-browser only." />
+  <meta name="description" content="OrgKit is a Chrome extension for Salesforce developers: Query, Schema, Compare, and Apex in the org already open in Chrome. Session in-browser only." />
   <style>
     :root {
-      color-scheme: light dark;
-      --bg: #0b1624;
-      --card: #122033;
-      --text: #e8eef6;
-      --muted: #9bb0c7;
-      --accent: #3b82f6;
-      --border: #2a4a6b;
-    }
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg: #f7fafc;
-        --card: #ffffff;
-        --text: #15202b;
-        --muted: #4a5d73;
-        --accent: #1f6feb;
-        --border: #d7e0ea;
-      }
+      color-scheme: dark;
+      --bg: #0d1117;
+      --card: #161b22;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --ink: #f0f6fc;
+      --border: #30363d;
     }
     body {
       margin: 0;
-      font: 16px/1.55 system-ui, -apple-system, Segoe UI, sans-serif;
+      font: 16px/1.55 "Inter", "Segoe UI", system-ui, sans-serif;
       color: var(--text);
-      background:
-        radial-gradient(900px 420px at 10% -10%, rgba(59, 130, 246, 0.22), transparent 60%),
-        radial-gradient(700px 360px at 90% 0%, rgba(15, 118, 110, 0.18), transparent 55%),
-        var(--bg);
+      background: var(--bg);
       min-height: 100vh;
     }
     main {
@@ -45,6 +33,7 @@
       font-weight: 800;
       letter-spacing: -0.03em;
       margin: 0 0 8px;
+      color: var(--ink);
     }
     .lede {
       color: var(--muted);
@@ -62,6 +51,7 @@
     h2 {
       margin: 0 0 10px;
       font-size: 18px;
+      color: var(--ink);
     }
     ul {
       margin: 0;
@@ -108,16 +98,17 @@
   <main>
     <h1 class="brand">OrgKit</h1>
     <p class="lede">
-      Salesforce developer toolkit for Chrome — Session Workbench, dual-org Org Compare,
-      SOQL, schema, Apex, and Setup utilities. Uses your open Salesforce tab session in the browser only.
+      Daily Salesforce work in the org already open in Chrome — Query, Schema, Compare, Apex.
+      Uses your tab session in the browser only. No extra login.
     </p>
 
     <section class="card">
-      <h2>What you get</h2>
+      <h2>What you use every day</h2>
       <ul>
-        <li><strong>Session Workbench</strong> — quick launch, continue, pinned SOQL, scratch pad</li>
-        <li><strong>Org Compare</strong> — objects, profiles, permission sets, flows, Apex, and more</li>
-        <li><strong>Day-to-day tools</strong> — SOQL/Tooling, Describe, metadata open, package.xml, Apex helpers</li>
+        <li><strong>Query</strong> — plain English or SOQL against this org</li>
+        <li><strong>Schema</strong> — how record types connect, plus field describe</li>
+        <li><strong>Compare</strong> — UAT vs Prod, or any two flow versions</li>
+        <li><strong>Apex</strong> — anonymous Apex and debug output</li>
       </ul>
       <div class="actions">
         <a class="btn primary" href="https://chrome.google.com/webstore/detail/addepnaekmgolifoifhhmloboifelnb">Chrome Web Store</a>
