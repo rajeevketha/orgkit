@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en" class="shell-wide">
+<head>
+  <meta charset="UTF-8" />
+  <title>Compare · OrgKit</title>
+  <link rel="stylesheet" href="../../../app/app.css" />
+  <style>
+    html, body { width: 1280px; height: 800px; min-height: 800px; overflow: hidden; }
+    .compare-results { max-height: 220px !important; }
+    .compare-session-list { max-height: none; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <button type="button" class="brand brand-home">
+      <img class="brand-mark" src="../../../icons/orgkit-32.png?v=1.12.1" alt="" width="32" height="32" />
+      <span>OrgKit</span>
+    </button>
+    <nav class="app-nav">
+      <button type="button" class="app-nav-btn">Home</button>
+      <button type="button" class="app-nav-btn">Query</button>
+      <button type="button" class="app-nav-btn">Schema</button>
+      <button type="button" class="app-nav-btn active">Compare</button>
+      <button type="button" class="app-nav-btn">Apex</button>
+      <button type="button" class="app-nav-btn">More</button>
+    </nav>
+  </header>
+  <section class="org-banner">
+    <div class="org-top">
+      <span class="pill sandbox">Sandbox</span>
+      <span class="org-host">acme--uat.sandbox.my.salesforce.com</span>
+    </div>
+  </section>
+  <section class="view active" style="display:block">
+    <p class="lede">Pick two Salesforce sessions, then scan what is live in each org. No extra login. <code>sid</code> is never stored.</p>
+    <div class="compare-chooser">
+      <div class="compare-chooser-head">
+        <div>
+          <div class="label" style="margin-top:0">Available Salesforce sessions</div>
+          <p class="hint compare-chooser-hint">Open the two orgs in any Chrome window, then Set as A / Set as B.</p>
+        </div>
+        <button type="button" class="btn">Refresh sessions</button>
+      </div>
+      <div class="compare-session-list">
+        <div class="compare-session-item is-a">
+          <div class="compare-session-main">
+            <span class="compare-org-badge">A</span>
+            <div class="compare-session-text">
+              <div class="compare-session-title">UAT · acme--uat.sandbox.my.salesforce.com</div>
+              <div class="compare-session-meta">Sandbox · this window</div>
+            </div>
+          </div>
+        </div>
+        <div class="compare-session-item is-b">
+          <div class="compare-session-main">
+            <span class="compare-org-badge compare-org-badge-b">B</span>
+            <div class="compare-session-text">
+              <div class="compare-session-title">Prod · acme.my.salesforce.com</div>
+              <div class="compare-session-meta">Production · other window</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="compare-mode-tabs">
+      <button type="button" class="compare-mode-tab active">Scan orgs</button>
+      <button type="button" class="compare-mode-tab">Two flow versions</button>
+    </div>
+    <div class="compare-summary">
+      <div class="compare-stat compare-stat-static"><strong>12</strong> Only in A</div>
+      <div class="compare-stat compare-stat-static"><strong>4</strong> Only in B</div>
+      <button type="button" class="compare-stat active"><strong>7</strong> Differ</button>
+    </div>
+    <div class="compare-tabs">
+      <button type="button" class="compare-tab">Only in A</button>
+      <button type="button" class="compare-tab">Only in B</button>
+      <button type="button" class="compare-tab active">Differ</button>
+    </div>
+    <div class="compare-results">
+      <div class="compare-row">
+        <div class="compare-row-head"><code>Subscription__c</code><span class="muted">Custom object · fields</span></div>
+        <div class="compare-field-block">
+          <div class="compare-field-block-title">A only</div>
+          <ul class="compare-field-list"><li><code>Renewal_Date__c</code> Date</li></ul>
+        </div>
+      </div>
+      <div class="compare-row">
+        <div class="compare-row-head"><code>Order_Flow</code><span class="muted">Flow · live version</span></div>
+        <div class="compare-field-block">
+          <ul class="compare-field-list"><li>A: v8 · B: v6</li></ul>
+        </div>
+      </div>
+      <div class="compare-row">
+        <div class="compare-row-head"><code>Case.Status</code><span class="muted">Picklist values</span></div>
+      </div>
+    </div>
+  </section>
+</body>
+</html>

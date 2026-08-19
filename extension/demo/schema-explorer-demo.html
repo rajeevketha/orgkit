@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OrgKit Schema Explorer — demo</title>
+  <style>
+    :root {
+      --bg: #f3f3f3;
+      --surface: #ffffff;
+      --surface-2: #f3f3f3;
+      --ink: #032d60;
+      --muted: #706e6b;
+      --border: #c9c9c9;
+      --accent: #0176d3;
+      --accent-soft: rgba(1, 118, 211, 0.12);
+      --font: "Segoe UI", "Helvetica Neue", sans-serif;
+      --mono: Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      font-size: 13px;
+      color: var(--ink);
+      background: var(--bg);
+      padding: 20px;
+      min-height: 100vh;
+    }
+    h1 { margin: 0 0 4px; font-size: 20px; }
+    .sub { color: var(--muted); margin: 0 0 16px; }
+    .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .filters button, .actions button, .node {
+      font: inherit; cursor: pointer;
+    }
+    .filters button {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 4px 10px;
+    }
+    .filters button.active {
+      border-color: rgba(1, 118, 211, 0.65);
+      background: var(--accent-soft);
+      color: var(--ink);
+    }
+    .search-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    input {
+      flex: 1;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+    }
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--ink);
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+    .btn.primary { background: var(--accent); border-color: var(--accent); }
+    .crumb { margin: 10px 0; color: var(--muted); }
+    .crumb strong { color: var(--ink); }
+    .summary { color: var(--muted); margin-bottom: 10px; }
+    .canvas {
+      display: grid;
+      grid-template-columns: 1fr 1.15fr 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+    .col-title {
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .list { display: flex; flex-direction: column; gap: 6px; }
+    .node {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      text-align: left;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+    .node:hover { border-color: var(--accent); background: var(--surface-2); }
+    .node.center {
+      cursor: default;
+      border-color: rgba(1, 118, 211, 0.55);
+      background: linear-gradient(160deg, rgba(1, 118, 211, 0.22), transparent 55%), var(--surface);
+    }
+    .kind { font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+    .kind-custom .kind { color: #f3b567; }
+    .kind-mdt .kind { color: #b7a6ff; }
+    .meta { color: var(--muted); font-size: 11px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    pre {
+      margin-top: 14px;
+      background: #0b1522;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: #cde3ff;
+      min-height: 48px;
+    }
+    .badge {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 11px;
+      color: var(--accent);
+      border: 1px solid rgba(1,118,211,.45);
+      border-radius: 6px;
+      padding: 1px 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Schema Explorer <span class="badge">OrgKit demo</span></h1>
+  <p class="sub">Interactive demo with sample org data (Account, Contact, custom Job__c, Region_Setting__mdt). Same layout as the extension.</p>
+
+  <div class="filters" id="filters">
+    <button type="button" class="active" data-filter="all">All</button>
+    <button type="button" data-filter="standard">Standard</button>
+    <button type="button" data-filter="custom">Custom (__c)</button>
+    <button type="button" data-filter="mdt">Metadata (__mdt)</button>
+  </div>
+  <div class="search-row">
+    <input id="search" list="objects" placeholder="Search Account, Contact, Job__c, Region_Setting__mdt…" value="Account" />
+    <datalist id="objects"></datalist>
+    <button type="button" class="btn primary" id="explore">Explore</button>
+  </div>
+  <div class="crumb" id="crumb"></div>
+  <div class="summary" id="summary"></div>
+  <div class="canvas">
+    <div>
+      <div class="col-title">Parents</div>
+      <div class="list" id="parents"></div>
+    </div>
+    <div>
+      <div class="col-title">Current object</div>
+      <div id="center"></div>
+      <div class="actions" id="actions"></div>
+    </div>
+    <div>
+      <div class="col-title">Children</div>
+      <div class="list" id="children"></div>
+    </div>
+  </div>
+  <pre id="soql">Click Explore to load schema…</pre>
+
+  <script type="module">
+    import {
+      objectKind,
+      objectKindClass,
+      extractParentRelations,
+      extractChildRelations,
+      buildObjectQuery,
+      buildParentPathQuery,
+      buildChildSubquery,
+      schemaSummary,
+      pickDisplayFields,
+      filterSchemaObjects
+    } from "../lib/schema-explorer.js";
+
+    const DESCRIBES = {
+      Account: {
+        name: "Account", label: "Account", custom: false, keyPrefix: "001",
+        fields: [
+          { name: "Id", type: "id" },
+          { name: "Name", type: "string", label: "Account Name" },
+          { name: "OwnerId", label: "Owner", type: "reference", relationshipName: "Owner", referenceTo: ["User"], nillable: false },
+          { name: "ParentId", label: "Parent Account", type: "reference", relationshipName: "Parent", referenceTo: ["Account"], nillable: true }
+        ],
+        childRelationships: [
+          { childSObject: "Contact", field: "AccountId", relationshipName: "Contacts" },
+          { childSObject: "Case", field: "AccountId", relationshipName: "Cases" },
+          { childSObject: "Opportunity", field: "AccountId", relationshipName: "Opportunities" },
+          { childSObject: "Job__c", field: "Account__c", relationshipName: "Jobs__r" }
+        ]
+      },
+      Contact: {
+        name: "Contact", label: "Contact", custom: false, keyPrefix: "003",
+        fields: [
+          { name: "Id", type: "id" },
+          { name: "Name", type: "string" },
+          { name: "AccountId", label: "Account", type: "reference", relationshipName: "Account", referenceTo: ["Account"] },
+          { name: "OwnerId", label: "Owner", type: "reference", relationshipName: "Owner", referenceTo: ["User"] }
+        ],
+        childRelationships: [
+          { childSObject: "Case", field: "ContactId", relationshipName: "Cases" },
+          { childSObject: "Opportunity", field: "ContactId", relationshipName: "Opportunities" }
+        ]
+      },
+      User: {
+        name: "User", label: "User", custom: false, keyPrefix: "005",
+        fields: [
+          { name: "Id", type: "id" },
+          { name: "Name", type: "string" },
+          { name: "Username", type: "string" }
+        ],
+        childRelationships: [
+          { childSObject: "Account", field: "OwnerId", relationshipName: "Accounts__r" },
+          { childSObject: "Contact", field: "OwnerId", relationshipName: null }
+        ]
+      },
+      Case: {
+        name: "Case", label: "Case", custom: false, keyPrefix: "500",
+        fields: [
+          { name: "Id", type: "id" },
+          { name: "CaseNumber", type: "string" },
+          { name: "Subject", type: "string" },
+          { name: "AccountId", label: "Account", type: "reference", relationshipName: "Account", referenceTo: ["Account"] },
+          { name: "ContactId", label: "Contact", type: "reference", relationshipName: "Contact", referenceTo: ["Contact"] }
+        ],
+        childRelationships: [
+          { childSObject: "CaseComment", field: "ParentId", relationshipName: "CaseComments" }
+        ]
+      },
+      Opportunity: {
+        name: "Opportunity", label: "Opportunity", custom: false, keyPrefix: "006",
+        fields: [
+          { name: "Id", type: "id" },
+          { name: "Name", type: "string" },
+          { name: "AccountId", label: "Account", type: "reference", relationshipName: "Account", referenceTo: ["Account"] }
+        ],
+        childRelationships: [
+          { childSObject: "OpportunityLineItem", field: "OpportunityId", relationshipName: "OpportunityLineItems" }
+        ]
+      },
+      Job__c: {
+        name: "Job__c", label: "Job", custom: true, keyPrefix: "a0B",
+        fields: [
+          { name: "Id", type: "id" },
+          { name: "Name", type: "string" },
+          { name: "Account__c", label: "Account", type: "reference", relationshipName: "Account__r", referenceTo: ["Account"] },
+          { name: "Status__c", type: "picklist", label: "Status" }
+        ],
+        childRelationships: [
+          { childSObject: "Job_Line__c", field: "Job__c", relationshipName: "Job_Lines__r" }
+        ]
+      },
+      Job_Line__c: {
+        name: "Job_Line__c", label: "Job Line", custom: true, keyPrefix: "a0C",
+        fields: [
+          { name: "Id", type: "id" },
+          { name: "Name", type: "string" },
+          { name: "Job__c", label: "Job", type: "reference", relationshipName: "Job__r", referenceTo: ["Job__c"] }
+        ],
+        childRelationships: []
+      },
+      Region_Setting__mdt: {
+        name: "Region_Setting__mdt", label: "Region Setting", custom: true, keyPrefix: "m0t",
+        fields: [
+          { name: "Id", type: "id" },
+          { name: "DeveloperName", type: "string" },
+          { name: "MasterLabel", type: "string" },
+          { name: "Owner_User__c", label: "Owner User", type: "reference", relationshipName: "Owner_User__r", referenceTo: ["User"] }
+        ],
+        childRelationships: []
+      },
+      CaseComment: {
+        name: "CaseComment", label: "Case Comment", custom: false, keyPrefix: "00a",
+        fields: [
+          { name: "Id", type: "id" },
+          { name: "CommentBody", type: "textarea" },
+          { name: "ParentId", label: "Case", type: "reference", relationshipName: "Parent", referenceTo: ["Case"] }
+        ],
+        childRelationships: []
+      },
+      OpportunityLineItem: {
+        name: "OpportunityLineItem", label: "Opportunity Product", custom: false, keyPrefix: "00k",
+        fields: [
+          { name: "Id", type: "id" },
+          { name: "OpportunityId", type: "reference", relationshipName: "Opportunity", referenceTo: ["Opportunity"] }
+        ],
+        childRelationships: []
+      }
+    };
+
+    const catalog = Object.values(DESCRIBES).map((d) => ({
+      name: d.name,
+      label: d.label,
+      custom: !!d.custom,
+      queryable: true
+    }));
+
+    let filter = "all";
+    let trail = [];
+    let current = null;
+
+    function refreshDatalist() {
+      const list = filterSchemaObjects(catalog, filter);
+      document.getElementById("objects").innerHTML = list
+        .map((o) => `<option value="${o.name}" label="${o.label}"></option>`)
+        .join("");
+    }
+
+    function setSoql(text) {
+      document.getElementById("soql").textContent = text;
+    }
+
+    function renderNode(rel, kindName, title, meta1, meta2, onClick) {
+      const kind = objectKind(kindName, /__c$|__mdt$/i.test(kindName));
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `node ${objectKindClass(kind)}`;
+      btn.innerHTML = `
+        <span class="kind">${kind}</span>
+        <strong>${title}</strong>
+        <span class="meta">${meta1 || ""}</span>
+        <span class="meta">${meta2 || ""}</span>`;
+      btn.addEventListener("click", onClick);
+      return btn;
+    }
+
+    function load(name, { reset = false } = {}) {
+      const describe = DESCRIBES[name];
+      if (!describe) {
+        document.getElementById("summary").textContent = `No demo describe for ${name}`;
+        return;
+      }
+      current = describe;
+      document.getElementById("search").value = name;
+      if (reset) trail = [{ name: describe.name, label: describe.label }];
+      else if (trail[trail.length - 1]?.name !== describe.name) {
+        trail = [...trail, { name: describe.name, label: describe.label }].slice(-8);
+      }
+
+      document.getElementById("crumb").innerHTML = trail
+        .map((t, i) =>
+          i === trail.length - 1
+            ? `<strong>${t.name}</strong>`
+            : `<a href="#" data-hop="${t.name}" data-i="${i}" style="color:#0176d3">${t.name}</a>`
+        )
+        .join(" → ");
+      document.querySelectorAll("[data-hop]").forEach((a) => {
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          const i = Number(a.getAttribute("data-i"));
+          trail = trail.slice(0, i + 1);
+          load(a.getAttribute("data-hop"));
+        });
+      });
+
+      document.getElementById("summary").textContent = schemaSummary(describe);
+
+      const parents = extractParentRelations(describe);
+      const children = extractChildRelations(describe);
+      const parentsEl = document.getElementById("parents");
+      const childrenEl = document.getElementById("children");
+      parentsEl.replaceChildren();
+      childrenEl.replaceChildren();
+
+      if (!parents.length) parentsEl.innerHTML = `<p class="meta">No parent lookups.</p>`;
+      parents.forEach((p) => {
+        parentsEl.appendChild(
+          renderNode(
+            p,
+            p.targetObject,
+            p.targetObject,
+            `${p.fieldName}${p.relationshipName ? " · " + p.relationshipName : ""}`,
+            p.type,
+            () => {
+              setSoql(buildParentPathQuery(describe, p));
+              load(p.targetObject);
+            }
+          )
+        );
+      });
+
+      if (!children.length) childrenEl.innerHTML = `<p class="meta">No child relationships.</p>`;
+      children.forEach((c) => {
+        childrenEl.appendChild(
+          renderNode(
+            c,
+            c.childObject,
+            c.childObject,
+            c.relationshipName || "(no relationship name)",
+            `via ${c.fieldName}`,
+            () => {
+              const q = buildChildSubquery(describe, c);
+              if (q) setSoql(q);
+              load(c.childObject);
+            }
+          )
+        );
+      });
+
+      const kind = objectKind(describe.name, !!describe.custom);
+      const fields = pickDisplayFields(describe);
+      document.getElementById("center").innerHTML = `
+        <div class="node center ${objectKindClass(kind)}">
+          <span class="kind">${kind}</span>
+          <strong>${describe.name}</strong>
+          <span class="meta">${describe.label}</span>
+          <span class="meta">${describe.fields.length} fields · keyPrefix ${describe.keyPrefix || "—"}</span>
+          <span class="meta">Sample: ${fields.join(", ")}</span>
+        </div>`;
+
+      const actions = document.getElementById("actions");
+      actions.replaceChildren();
+      const mk = (label, fn, primary = false) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn" + (primary ? " primary" : "");
+        b.textContent = label;
+        b.addEventListener("click", fn);
+        actions.appendChild(b);
+      };
+      mk("Query this object", () => setSoql(buildObjectQuery(describe)), true);
+      if (parents[0]) {
+        mk(`Query via ${parents[0].relationshipName || parents[0].fieldName}`, () =>
+          setSoql(buildParentPathQuery(describe, parents[0]))
+        );
+      }
+      const child = children.find((c) => c.relationshipName);
+      if (child) {
+        mk(`Child subquery (${child.relationshipName})`, () => setSoql(buildChildSubquery(describe, child)));
+      }
+      setSoql(buildObjectQuery(describe));
+    }
+
+    document.getElementById("filters").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-filter]");
+      if (!btn) return;
+      filter = btn.getAttribute("data-filter");
+      document.querySelectorAll("[data-filter]").forEach((b) => b.classList.toggle("active", b === btn));
+      refreshDatalist();
+    });
+    document.getElementById("explore").addEventListener("click", () => {
+      load(document.getElementById("search").value.trim(), { reset: true });
+    });
+    document.getElementById("search").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") load(e.target.value.trim(), { reset: true });
+    });
+
+    refreshDatalist();
+    load("Account", { reset: true });
+  </script>
+</body>
+</html>

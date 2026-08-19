@@ -1,0 +1,86 @@
+================================================================================
+Chrome Web Store — OrgKit listing copy (paste into Developer Dashboard)
+Version covered: 1.12.1
+================================================================================
+
+LANGUAGE
+  English (United States)
+
+CATEGORY
+  Productivity
+  (Secondary/tags if asked: Developer Tools, Salesforce)
+
+================================================================================
+SHORT DESCRIPTION  (max 132 characters — count carefully)
+================================================================================
+
+Query, schema, compare, and Apex in the Salesforce org already open in Chrome. Tab session only.
+
+Character count: 96
+
+================================================================================
+DETAILED DESCRIPTION
+================================================================================
+
+OrgKit is four tools for the Salesforce org already open in Chrome.
+
+You stay in the org you logged into. OrgKit uses that tab session — it does not ask for a password and does not store your session id.
+
+What you use
+• Query — describe the rows in plain English, or run SOQL / Tooling
+• Schema — a map of how record types connect, plus a field list
+• Compare — UAT vs Prod (objects, permissions, live flow versions) or any two flow versions
+• Apex — anonymous Apex and debug output
+
+Home shows those four tools first. Recent work and a scratch pad stay folded underneath. Extra paste tools live under More.
+
+How authentication works
+OrgKit does not ask you to type a password into the extension. It uses the Salesforce session cookie from a Salesforce tab you already logged into in Chrome, only to call Salesforce APIs for actions you start. The session stays in your browser. This is the same session model used by tools such as Salesforce Inspector Reloaded.
+
+Org Compare picks orgs from open Salesforce tabs across Chrome windows (same profile) and optional cookie sessions. It never stores sid.
+
+Privacy & permissions
+• No OrgKit backend collecting org data
+• Session id is not written to sync storage and is not sent to AI providers
+• Optional AI sends only the text you paste, to the endpoint you configure
+• Full policy: https://rajeevketha.github.io/orgkit/privacy.html
+
+Permissions (summary)
+• cookies — Salesforce sid on Salesforce domains only
+• storage — settings, favorites, saved SOQL, workbench history/scratch, last Org Compare A/B org keys (never stores sid)
+• tabs — list open Salesforce tabs across windows for Active session / Org Compare
+• Host permissions — Salesforce domains only; OpenAI hosts are optional
+• Does not request activeTab or scripting
+
+================================================================================
+SINGLE PURPOSE
+================================================================================
+
+OrgKit lets Salesforce developers query data, read schema, compare two orgs or flow versions, and run anonymous Apex in the org already open in Chrome, using the browser Salesforce session from a logged-in tab.
+
+================================================================================
+WHAT’S NEW IN THIS VERSION  (Chrome Web Store dashboard — “What’s new”)
+================================================================================
+
+Dark theme and a new K mark. Same four tools: Query, Schema, Compare, Apex. Chrome updates this in place — you do not install a second copy.
+
+================================================================================
+PUBLIC URLS (Chrome Web Store — OrgKit)
+================================================================================
+
+Homepage URL
+  https://rajeevketha.github.io/orgkit/
+
+Support URL
+  https://github.com/rajeevketha/orgkit/issues
+
+Official URL
+  None
+
+Privacy policy URL
+  https://rajeevketha.github.io/orgkit/privacy.html
+
+Notes
+  - Product name is OrgKit.
+  - Confirm privacy URL AND homepage open in Incognito before submit.
+  - Homepage copy must match this listing (Query / Schema / Compare / Apex). Do not submit while the live page still says Session Workbench.

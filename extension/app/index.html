@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OrgKit</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="../icons/orgkit-32.png?v=1.12.1" />
+  <link rel="icon" type="image/png" sizes="48x48" href="../icons/orgkit-48.png?v=1.12.1" />
+  <link rel="shortcut icon" href="../icons/orgkit-32.png?v=1.12.1" />
+  <link rel="stylesheet" href="app.css" />
+  <script>
+    (function setOrgKitFavicon() {
+      var href = "../icons/orgkit-32.png?v=1.12.1";
+      try {
+        if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL) {
+          href = chrome.runtime.getURL("icons/orgkit-32.png") + "?v=1.12.1";
+        }
+      } catch (e) {}
+      document.querySelectorAll("link[rel*='icon']").forEach(function (el) { el.remove(); });
+      var link = document.createElement("link");
+      link.rel = "icon";
+      link.type = "image/png";
+      link.href = href;
+      document.head.appendChild(link);
+    })();
+  </script>
+</head>
+<body>
+  <header class="header">
+    <button type="button" class="icon-btn hidden" id="backBtn" title="Home">←</button>
+    <button type="button" class="brand brand-home" data-open="home" title="Home">
+      <img class="brand-mark" src="../icons/orgkit-32.png?v=1.12.1" alt="" width="32" height="32" />
+      <span>OrgKit</span>
+    </button>
+    <nav class="app-nav" aria-label="OrgKit">
+      <button type="button" class="app-nav-btn" data-nav="home" data-open="home">Home</button>
+      <button type="button" class="app-nav-btn" data-nav="nl-soql" data-open="nl-soql">Query</button>
+      <button type="button" class="app-nav-btn" data-nav="schema" data-open="schema">Schema</button>
+      <button type="button" class="app-nav-btn" data-nav="org-compare" data-open="org-compare">Compare</button>
+      <button type="button" class="app-nav-btn" data-nav="anon-apex" data-open="anon-apex">Apex</button>
+      <button type="button" class="app-nav-btn" data-nav="more" data-open="more">More</button>
+    </nav>
+    <button type="button" class="icon-btn" id="openOptions" title="Settings">⚙</button>
+  </header>
+
+  <section id="orgBanner" class="org-banner muted">
+    <div class="org-top">
+      <span id="envPill" class="pill">—</span>
+      <span id="orgHost" class="org-host">Open a Salesforce tab</span>
+      <button type="button" class="btn ghost org-refresh-btn" id="refreshSessionsBtn" title="Refresh Salesforce sessions">↻</button>
+    </div>
+    <div class="org-session-row" id="orgSessionRow">
+      <label class="label tight" for="activeSessionSelect">Active session</label>
+      <select id="activeSessionSelect" class="select block-select" title="Switch between open Salesforce orgs / sandboxes"></select>
+    </div>
+    <div id="orgMeta" class="org-meta"></div>
+  </section>
+
+  <!-- SESSION WORKBENCH (home) -->
+  <section id="view-home" class="view active">
+    <div id="whatsNew" class="whats-new hidden" hidden>
+      <div>
+        <p class="home-kicker">Updated on this computer</p>
+        <p>
+          Chrome updated OrgKit in place. Same extension — do not install a second copy.
+          New look: dark theme and the K mark. Query, Schema, Compare, and Apex are unchanged.
+        </p>
+      </div>
+      <button type="button" class="btn" id="whatsNewDismiss">Got it</button>
+    </div>
+
+    <div class="home-hero">
+      <p class="home-kicker">Salesforce, already open in Chrome</p>
+      <h1>Query, schema, compare, and Apex — in the org you are in</h1>
+      <p>OrgKit uses the Salesforce tab you already logged into. No extra login. Pick one of the four tools.</p>
+    </div>
+
+    <div class="daily-grid" id="wbLaunch">
+      <button type="button" class="daily-card" data-open="nl-soql">
+        <span class="daily-kicker">Query</span>
+        <strong>Find records in English</strong>
+        <span>Describe the rows. OrgKit writes SOQL and can run it in this org.</span>
+      </button>
+      <button type="button" class="daily-card" data-open="schema">
+        <span class="daily-kicker">Schema</span>
+        <strong>See how records connect</strong>
+        <span>A map of objects and lookup lines, plus a field list when you need it.</span>
+      </button>
+      <button type="button" class="daily-card" data-open="org-compare">
+        <span class="daily-kicker">Compare</span>
+        <strong>UAT vs Prod, or two flows</strong>
+        <span>What is live in each org, or any two flow versions.</span>
+      </button>
+      <button type="button" class="daily-card" data-open="anon-apex">
+        <span class="daily-kicker">Apex</span>
+        <strong>Run anonymous Apex</strong>
+        <span>Execute a snippet in this org and read the debug log.</span>
+      </button>
+    </div>
+
+    <details class="home-fold" open>
+      <summary>Continue in this org</summary>
+      <div class="wb-grid">
+        <div class="wb-card">
+          <div class="wb-card-head">
+            <h3>Recent</h3>
+            <button type="button" class="linkish" id="wbClearContinue" title="Clear continue list">Clear</button>
+          </div>
+          <p class="hint wb-hint">Saved in this browser only.</p>
+          <div id="wbContinue" class="wb-list"></div>
+        </div>
+        <div class="wb-card">
+          <div class="wb-card-head">
+            <h3>Pinned queries</h3>
+            <button type="button" class="linkish" data-open="soql-run">Library</button>
+          </div>
+          <p class="hint wb-hint">From your SOQL library for this org.</p>
+          <div id="wbPinned" class="wb-list"></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="home-fold">
+      <summary>Scratch pad</summary>
+      <div class="wb-card wb-scratch">
+        <div class="wb-card-head">
+          <h3>Notes for this org</h3>
+          <span class="hint" id="wbScratchHint">Saved in this browser</span>
+        </div>
+        <div class="wb-scratch-grid">
+          <div>
+            <label class="label" for="wbScratchSoql">SOQL</label>
+            <textarea id="wbScratchSoql" class="textarea" rows="4" placeholder="SELECT Id, Name FROM Account LIMIT 10" spellcheck="false"></textarea>
+            <button type="button" class="btn" id="wbOpenScratchSoql">Open in SOQL Runner</button>
+          </div>
+          <div>
+            <label class="label" for="wbScratchApex">Anonymous Apex</label>
+            <textarea id="wbScratchApex" class="textarea" rows="4" placeholder="System.debug('hello');" spellcheck="false"></textarea>
+            <button type="button" class="btn" id="wbOpenScratchApex">Open in Anon Apex</button>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="home-fold">
+      <summary>Privacy</summary>
+      <div class="trust-card">
+        <strong>What OrgKit can see</strong>
+        <ul>
+          <li>Uses your open Salesforce tab session in the browser only — OrgKit does not upload your <code>sid</code>.</li>
+          <li>History, scratch pad, last Org Compare pair, and the active session stay in this browser (org keys only — never <code>sid</code>).</li>
+          <li>Deletes and saves ask for confirmation before changing org data.</li>
+        </ul>
+        <p class="trust-links">
+          <a href="../privacy.html" target="_blank" rel="noopener">Privacy policy</a>
+          ·
+          <button type="button" class="linkish" id="homeOpenSettings">Settings</button>
+        </p>
+      </div>
+    </details>
+  </section>
+
+  <section id="view-more" class="view">
+    <p class="lede">Extra tools. Everyday work is Query, Schema, Compare, and Apex on Home.</p>
+    <div class="feature-grid" id="featureGrid"></div>
+    <div class="extras">
+      <div class="label" style="margin-top:0">Utilities</div>
+      <div class="util-row">
+        <button type="button" class="btn" data-open="links">Setup links</button>
+        <button type="button" class="btn" data-open="favs">Favorites</button>
+        <button type="button" class="btn" data-open="ids">Record / ID</button>
+        <button type="button" class="btn" data-open="flow-clean">Inactive flow versions</button>
+        <button type="button" class="btn" data-open="package">package.xml</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURE: NL SOQL -->
+  <section id="view-nl-soql" class="view">
+    <div class="subnav" role="tablist" aria-label="Query">
+      <button type="button" class="subnav-btn active" data-open="nl-soql">Plain English</button>
+      <button type="button" class="subnav-btn" data-open="soql-run">SOQL runner</button>
+    </div>
+    <p class="lede nl-view-lede">Describe the rows you need. OrgKit writes SOQL for this org and can run it.</p>
+    <div class="nl-examples" id="nlExamples" aria-label="Example prompts">
+      <button type="button" class="nl-chip" data-nl-example="Accounts created this week with their owner name">Accounts this week + owner</button>
+      <button type="button" class="nl-chip" data-nl-example="Open Cases for high priority with Account Name">High-priority Cases</button>
+      <button type="button" class="nl-chip" data-nl-example="Custom objects modified in the last 7 days">Recent custom objects</button>
+      <button type="button" class="nl-chip" data-nl-example="Apex classes that contain Batchable">Tooling: Batchable classes</button>
+    </div>
+    <div class="row wrap" style="margin-bottom:8px">
+      <label class="label tight" for="nlApiMode">API</label>
+      <select id="nlApiMode" class="select" title="Standard objects / custom metadata, or Tooling API">
+        <option value="rest">Standard / CMDT</option>
+        <option value="tooling">Tooling API</option>
+      </select>
+    </div>
+    <label class="label" for="nlInput">Describe the data you need</label>
+    <textarea id="nlInput" class="textarea" rows="3" placeholder="e.g. Contacts at Accounts in California, limit 50"></textarea>
+    <p class="hint">
+      Works with standard objects, custom objects (__c), and custom metadata (__mdt). Tooling mode matches ApexClass, FlowDefinition, Flow versions, and other Tooling entities. Results respect your Salesforce permissions.
+    </p>
+    <div class="row">
+      <button type="button" class="btn primary" id="genSoql">Generate SOQL</button>
+      <button type="button" class="btn" id="runGenSoql">Run</button>
+      <button type="button" class="btn" id="copyGenSoql">Copy SOQL</button>
+    </div>
+    <pre id="nlSoqlOut" class="result"></pre>
+    <div id="nlQueryPanel" class="query-panel hidden" data-query-panel="nl">
+      <div class="query-toolbar">
+        <span class="query-meta" data-query-meta></span>
+        <button type="button" class="btn" data-export="sheets">Copy for Sheets</button>
+        <button type="button" class="btn" data-export="excel">Export Excel</button>
+        <button type="button" class="btn ghost" data-export="csv">CSV</button>
+        <button type="button" class="btn ghost" data-export="json">JSON</button>
+      </div>
+      <div class="query-table-wrap" data-query-table></div>
+    </div>
+    <div id="nlQueryStatus" class="query-status"></div>
+  </section>
+
+  <!-- FEATURE: Flow Analyzer -->
+  <section id="view-flow" class="view">
+    <div class="row">
+      <button type="button" class="btn primary" id="loadFlows">Load flows from org</button>
+      <button type="button" class="btn" id="analyzeFlowPaste">Analyze paste</button>
+    </div>
+    <textarea id="flowPaste" class="textarea" rows="4" placeholder="Optional: paste Flow JSON/XML metadata"></textarea>
+    <div id="flowOut" class="report"></div>
+  </section>
+
+  <!-- FEATURE: Governor -->
+  <section id="view-governor" class="view">
+    <div class="row wrap">
+      <button type="button" class="btn" id="loadOrgLimits">Load org limits</button>
+      <span id="orgLimitsStatus" class="hint" style="margin:0"></span>
+    </div>
+    <div id="orgLimitsOut" class="report"></div>
+    <label class="label" for="govInput">Paste Apex (or describe the transaction)</label>
+    <textarea id="govInput" class="textarea" rows="8" placeholder="for (SObject record : records) {&#10;  List&lt;SObject&gt; related = [SELECT Id FROM Related__c WHERE ParentId__c = :record.Id];&#10;}"></textarea>
+    <button type="button" class="btn primary block" id="runGovernor">Predict code limits</button>
+    <div id="govOut" class="report"></div>
+  </section>
+
+  <!-- FEATURE: Error Decoder -->
+  <section id="view-errors" class="view">
+    <label class="label" for="errInput">Paste Salesforce error</label>
+    <textarea id="errInput" class="textarea" rows="5" placeholder="System.DmlException: Update failed... UNABLE_TO_LOCK_ROW..."></textarea>
+    <div class="row">
+      <button type="button" class="btn primary" id="decodeErr">Decode</button>
+      <button type="button" class="btn" id="decodeErrAi">Decode + AI</button>
+    </div>
+    <div id="errOut" class="report"></div>
+  </section>
+
+  <!-- FEATURE: Debug Log -->
+  <section id="view-logs" class="view">
+    <label class="label" for="logInput">Paste debug log</label>
+    <textarea id="logInput" class="textarea" rows="8" placeholder="64.0 APEX_CODE,DEBUG;...&#10;Number of SOQL queries: 42 out of 100"></textarea>
+    <button type="button" class="btn primary block" id="analyzeLog">Analyze log</button>
+    <div id="logOut" class="report"></div>
+  </section>
+
+  <!-- FEATURE: Formula -->
+  <section id="view-formula" class="view">
+    <label class="label" for="formulaInput">Describe the formula</label>
+    <textarea id="formulaInput" class="textarea" rows="3" placeholder="Checkbox true when status is open or priority is high"></textarea>
+    <div class="row">
+      <button type="button" class="btn primary" id="buildFormula">Build</button>
+      <button type="button" class="btn" id="copyFormula">Copy</button>
+    </div>
+    <pre id="formulaOut" class="result"></pre>
+    <div id="formulaHelpers" class="helpers"></div>
+  </section>
+
+  <!-- FEATURE: Permissions -->
+  <section id="view-perms" class="view">
+    <label class="label" for="permUser">Username or User Id</label>
+    <input id="permUser" class="input" placeholder="user@example.com" />
+    <label class="label" for="permObject">Object API name</label>
+    <input id="permObject" class="input" list="permObjectList" placeholder="Standard or custom object API name" autocomplete="off" />
+    <datalist id="permObjectList"></datalist>
+    <p class="hint">Supports standard and custom objects (__c). Type to search the org object list.</p>
+    <button type="button" class="btn primary block" id="investigatePerms">Investigate</button>
+    <div id="permOut" class="report"></div>
+  </section>
+
+  <!-- FEATURE: Apex Review -->
+  <section id="view-apex" class="view">
+    <label class="label" for="apexClassSearch">Load class from org</label>
+    <div class="row">
+      <input type="search" id="apexClassSearch" class="input grow" placeholder="Search Apex class name…" />
+      <button type="button" class="btn" id="searchApexClasses">Search</button>
+    </div>
+    <div id="apexClassList" class="package-members"></div>
+    <div id="apexClassStatus" class="hint"></div>
+    <label class="label" for="apexInput">Apex source</label>
+    <textarea id="apexInput" class="textarea" rows="8" placeholder="Select a class above, or paste Apex here…"></textarea>
+    <button type="button" class="btn primary block" id="reviewApex">Review</button>
+    <div id="apexOut" class="report"></div>
+  </section>
+
+  <!-- FEATURE: Describe Browser -->
+  <section id="view-describe" class="view">
+    <div class="subnav" role="tablist" aria-label="Schema">
+      <button type="button" class="subnav-btn" data-open="schema">Map</button>
+      <button type="button" class="subnav-btn active" data-open="describe">Field list</button>
+    </div>
+    <div class="row" style="position:relative">
+      <div class="soql-editor grow" style="flex:1;min-width:0">
+        <input type="search" id="describeObjectSearch" class="input grow" list="describeObjectList" placeholder="Search standard or custom object…" autocomplete="off" style="width:100%" />
+        <div id="describeObjectSuggest" class="soql-suggest hidden" role="listbox" aria-label="Object suggestions"></div>
+      </div>
+      <button type="button" class="btn primary" id="loadDescribe">Describe</button>
+    </div>
+    <datalist id="describeObjectList"></datalist>
+    <p class="hint" id="describeObjectHint">Loads all org objects (including custom __c / __mdt). Search by API name or label.</p>
+    <input type="search" id="describeFieldFilter" class="input" placeholder="Filter fields…" style="margin-top:8px" />
+    <div id="describeSummary" class="hint"></div>
+    <div id="describeFields" class="describe-list"></div>
+    <div id="describeDetail" class="report"></div>
+    <div id="describeDependent" class="report"></div>
+  </section>
+
+  <!-- FEATURE: Schema Explorer -->
+  <section id="view-schema" class="view">
+    <div class="subnav" role="tablist" aria-label="Schema">
+      <button type="button" class="subnav-btn active" data-open="schema">Map</button>
+      <button type="button" class="subnav-btn" data-open="describe">Field list</button>
+    </div>
+    <p class="lede">
+      Search a record type. Tiles are objects; lines are lookups. Drag a tile to move it. Use <strong>Technical</strong> for API names.
+    </p>
+    <div class="schema-filter-row" role="group" aria-label="Object type filter">
+      <button type="button" class="schema-filter active" data-schema-filter="all">All</button>
+      <button type="button" class="schema-filter" data-schema-filter="standard">Standard</button>
+      <button type="button" class="schema-filter" data-schema-filter="custom">Custom (__c)</button>
+      <button type="button" class="schema-filter" data-schema-filter="mdt">Metadata (__mdt)</button>
+    </div>
+    <div class="row" style="position:relative">
+      <div class="soql-editor grow" style="flex:1;min-width:0">
+        <input
+          type="search"
+          id="schemaObjectSearch"
+          class="input grow"
+          list="schemaObjectList"
+          placeholder="Search a record type — Account, Contact, custom objects…"
+          autocomplete="off"
+          style="width:100%"
+        />
+        <div id="schemaObjectSuggest" class="soql-suggest hidden" role="listbox" aria-label="Schema object suggestions"></div>
+      </div>
+      <button type="button" class="btn primary" id="loadSchema">Explore</button>
+    </div>
+    <datalist id="schemaObjectList"></datalist>
+    <p class="hint" id="schemaObjectHint">Loads all org objects (including custom and custom metadata).</p>
+    <nav id="schemaBreadcrumb" class="schema-breadcrumb" aria-label="Schema navigation"></nav>
+    <div id="schemaSummary" class="hint"></div>
+    <div id="schemaBuilder" class="schema-builder hidden" aria-live="polite">
+      <div class="schema-builder-toolbar">
+        <span class="hint" style="margin:0" id="schemaCanvasHint">Drag a tile to move it · empty space pans the map</span>
+        <div class="row wrap" style="margin:0;gap:6px">
+          <button type="button" class="btn ghost active" id="schemaToggleSimple" title="Simple or technical labels">Simple</button>
+          <button type="button" class="btn ghost" id="schemaTogglePerms" title="Permissions drawer (session / as-user)">Permissions</button>
+          <button type="button" class="btn ghost" id="schemaResetLayout" title="Reset card positions">Reset layout</button>
+          <button type="button" class="btn ghost" id="schemaZoomOut" title="Zoom out">−</button>
+          <button type="button" class="btn ghost" id="schemaZoomReset" title="Fit canvas">Fit</button>
+          <button type="button" class="btn ghost" id="schemaZoomIn" title="Zoom in">+</button>
+        </div>
+      </div>
+      <p class="schema-story" id="schemaRelationStory"></p>
+      <div class="schema-legend" id="schemaLegend">
+        <span class="schema-legend-item"><i class="lg-lookup"></i> Linked to</span>
+        <span class="schema-legend-item"><i class="lg-md"></i> Must belong to (required parent)</span>
+        <span class="schema-legend-item">Every line connects two tiles · hover a line to read it</span>
+      </div>
+      <div class="schema-builder-body">
+        <div class="schema-viewport" id="schemaViewport">
+          <div class="schema-world" id="schemaWorld">
+            <svg class="schema-lines" id="schemaLines" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div class="schema-cards" id="schemaCards"></div>
+          </div>
+        </div>
+        <aside class="schema-perm-drawer" id="schemaPermDrawer" hidden>
+          <div class="schema-perm-drawer-head">
+            <strong>Permissions</strong>
+            <button type="button" class="btn ghost" id="schemaPermClose" title="Close">×</button>
+          </div>
+          <div id="schemaPermBody" class="schema-perm-body"></div>
+        </aside>
+      </div>
+      <div class="schema-actions" id="schemaActions"></div>
+    </div>
+    <div id="schemaFieldMenu" class="schema-field-menu hidden" role="menu" hidden></div>
+    <pre id="schemaSoqlPreview" class="result schema-soql-preview hidden"></pre>
+  </section>
+
+  <!-- FEATURE: Org Compare -->
+  <section id="view-org-compare" class="view">
+    <p class="lede">
+      Pick two Salesforce sessions, then either scan what is live in each org, or compare two flow versions.
+      No extra login. <code>sid</code> is never stored.
+    </p>
+
+    <div class="compare-chooser">
+      <div class="compare-chooser-head">
+        <div>
+          <div class="label" style="margin-top:0">Available Salesforce sessions</div>
+          <p class="hint compare-chooser-hint" id="compareChooserHint">
+            Open the two orgs in any Chrome window/tab, then use <strong>Set as A</strong> / <strong>Set as B</strong> (or the dropdowns below).
+          </p>
+        </div>
+        <button type="button" class="btn" id="refreshCompareOrgs">Refresh sessions</button>
+      </div>
+      <div id="compareSessionList" class="compare-session-list" role="list"></div>
+    </div>
+
+    <div class="compare-org-cards" id="compareOrgCards">
+      <div class="compare-org-card" data-side="A">
+        <div class="compare-org-card-head">
+          <span class="compare-org-badge">A</span>
+          <span class="compare-org-env" id="compareEnvLeft">Org A</span>
+        </div>
+        <label class="label" for="compareOrgLeft">Select org A</label>
+        <select id="compareOrgLeft" class="select block-select"></select>
+        <div class="compare-org-meta" id="compareMetaLeft">Pick a logged-in Salesforce session</div>
+      </div>
+      <div class="compare-swap-wrap">
+        <button type="button" class="btn compare-swap" id="swapCompareOrgs" title="Swap A and B">⇄ Swap</button>
+      </div>
+      <div class="compare-org-card" data-side="B">
+        <div class="compare-org-card-head">
+          <span class="compare-org-badge compare-org-badge-b">B</span>
+          <span class="compare-org-env" id="compareEnvRight">Org B</span>
+        </div>
+        <label class="label" for="compareOrgRight">Select org B</label>
+        <select id="compareOrgRight" class="select block-select"></select>
+        <div class="compare-org-meta" id="compareMetaRight">Pick a logged-in Salesforce session</div>
+      </div>
+    </div>
+    <div class="compare-mode-tabs" role="tablist" aria-label="Compare mode">
+      <button type="button" class="compare-mode-tab active" data-compare-mode="inventory" id="compareModeInventory">
+        Scan orgs
+      </button>
+      <button type="button" class="compare-mode-tab" data-compare-mode="flowVersions" id="compareModeFlowVersions">
+        Two flow versions
+      </button>
+    </div>
+    <p class="hint" id="compareModeHint">
+      Scan orgs lists what is live in each org. Two flow versions lets you pick any version in the same org or across two orgs.
+    </p>
+
+    <div id="compareInventoryPanel">
+    <div class="compare-categories">
+      <div class="compare-categories-head">
+        <div class="label" style="margin-top:0">What to compare</div>
+        <div class="row wrap compare-cat-presets">
+          <button type="button" class="btn" id="compareCatsCommon" title="Objects, profiles, perm sets, flows, Apex, validation rules">Common pack</button>
+          <button type="button" class="btn" id="compareCatsFlows" title="Only compare which flow version is live in each org">Active flow versions</button>
+          <button type="button" class="btn" id="compareCatsAll">Select all</button>
+          <button type="button" class="btn" id="compareCatsNone">Clear</button>
+        </div>
+      </div>
+      <div id="compareCategoryList" class="compare-category-list"></div>
+      <div class="row wrap" style="margin-top:8px">
+        <label class="label tight" for="compareMode">Object scope</label>
+        <select id="compareMode" class="select" title="Which objects to describe when Objects & fields is selected">
+          <option value="custom" selected>Custom objects + CMDT</option>
+          <option value="custom-no-mdt">Custom objects only (__c)</option>
+          <option value="all">All objects (slower)</option>
+        </select>
+        <label class="check-inline">
+          <input type="checkbox" id="compareCustomFieldsOnly" />
+          Diff custom fields only
+        </label>
+        <button type="button" class="btn primary" id="runOrgCompare">Compare</button>
+      </div>
+    </div>
+    <div class="compare-progress hidden" id="compareProgress" aria-hidden="true">
+      <div class="compare-progress-track">
+        <div class="compare-progress-bar" id="compareProgressBar"></div>
+      </div>
+      <div id="compareProgressLabel" class="hint">Preparing…</div>
+    </div>
+    <div id="compareStatus" class="hint"></div>
+    <div id="compareSummary" class="compare-summary hidden"></div>
+    <div id="compareCategoryFilter" class="compare-cat-filter hidden" role="tablist" aria-label="Filter by category"></div>
+    <div id="compareTabs" class="compare-tabs hidden" role="tablist">
+      <button type="button" class="compare-tab active" data-compare-tab="onlyA">Only in A</button>
+      <button type="button" class="compare-tab" data-compare-tab="onlyB">Only in B</button>
+      <button type="button" class="compare-tab" data-compare-tab="differ">Differ</button>
+    </div>
+    <input type="search" id="compareFilter" class="input hidden" placeholder="Filter by name / category…" style="margin-top:8px" />
+    <div class="row wrap compare-actions hidden" id="compareActions">
+      <button type="button" class="btn" id="copyCompareApiNames">Copy API names</button>
+      <button type="button" class="btn" id="copyComparePackageMembers">Copy package.xml members</button>
+    </div>
+    <div id="compareResults" class="compare-results"></div>
+    </div>
+
+    <div id="compareFlowVersionPanel" class="hidden">
+      <p class="hint">
+        Pick the same org twice to compare v3 vs v8 in one sandbox, or two orgs to compare a version in UAT with one in Prod.
+        OrgKit loads version lists first, then fetches only the two versions you select (not every flow’s Metadata).
+      </p>
+      <label class="label" for="flowVersionApiName">Flow API name or search</label>
+      <div class="row wrap">
+        <input
+          id="flowVersionApiName"
+          class="input grow"
+          list="flowVersionApiList"
+          placeholder="Order_Flow or search by label"
+          autocomplete="off"
+        />
+        <datalist id="flowVersionApiList"></datalist>
+        <button type="button" class="btn" id="findFlowVersionDefs">Find</button>
+        <button type="button" class="btn primary" id="loadFlowVersions">Load versions</button>
+      </div>
+      <div id="flowVersionDefPicks" class="flow-version-def-picks hidden"></div>
+      <div class="flow-version-picks">
+        <div class="flow-version-pick">
+          <label class="label" for="flowVersionLeft">Version A</label>
+          <select id="flowVersionLeft" class="select block-select"></select>
+        </div>
+        <div class="flow-version-pick">
+          <label class="label" for="flowVersionRight">Version B</label>
+          <select id="flowVersionRight" class="select block-select"></select>
+        </div>
+      </div>
+      <div class="row wrap" style="margin-top:8px">
+        <button type="button" class="btn primary" id="runFlowVersionCompare">Compare these versions</button>
+      </div>
+      <div id="flowVersionStatus" class="hint"></div>
+      <div id="flowVersionResults" class="compare-results"></div>
+    </div>
+  </section>
+
+  <!-- FEATURE: Metadata Quick Open -->
+  <section id="view-meta-open" class="view">
+    <label class="label" for="metaType">Type (optional)</label>
+    <select id="metaType" class="select block-select"></select>
+    <label class="label" for="metaQuery">Search name</label>
+    <div class="row">
+      <input type="search" id="metaQuery" class="input grow" placeholder="Class, flow, LWC, or other metadata name…" />
+      <button type="button" class="btn primary" id="searchMeta">Search</button>
+    </div>
+    <div id="metaResults" class="report"></div>
+  </section>
+
+  <!-- FEATURE: Package.xml Builder -->
+  <section id="view-package" class="view">
+    <p class="hint">Select metadata members, then generate a deployable <code>package.xml</code>.</p>
+    <label class="label" for="packageType">Metadata type</label>
+    <div class="row">
+      <select id="packageType" class="select grow-select"></select>
+      <button type="button" class="btn primary" id="loadPackageMembers">Load</button>
+    </div>
+    <input type="search" id="packageMemberFilter" class="input" placeholder="Filter members…" style="margin-top:8px" />
+    <div id="packageMembers" class="package-members"></div>
+    <div class="row wrap">
+      <button type="button" class="btn" id="clearPackageSel">Clear selection</button>
+      <button type="button" class="btn primary" id="genPackageXml">Generate package.xml</button>
+      <button type="button" class="btn" id="copyPackageXml">Copy</button>
+    </div>
+    <div id="packageSelection" class="hint"></div>
+    <pre id="packageXmlOut" class="result"></pre>
+  </section>
+
+  <!-- FEATURE: Inactive Flow Cleaner -->
+  <section id="view-flow-clean" class="view">
+    <p class="hint">
+      Inactive flow versions (Draft / Obsolete / InvalidDraft) often block field deletion.
+      Load them, optionally filter by field API name, then delete selected versions.
+      <strong>Active versions are never deleted.</strong>
+      To see whether sandbox and production are on the same live version, use
+      <button type="button" class="linkish" id="openFlowVersionCompare">Org Compare → Active flow versions</button>.
+      To diff v3 vs v8 in one org (or across orgs), use
+      <button type="button" class="linkish" id="openTwoFlowVersions">Two flow versions</button>.
+    </p>
+    <label class="label" for="flowCleanObject">Object API (optional)</label>
+    <input id="flowCleanObject" class="input" placeholder="MyObject__c" />
+    <label class="label" for="flowCleanField">Field API name to find in flows (optional)</label>
+    <input id="flowCleanField" class="input" placeholder="My_Field__c or MyObject__c.My_Field__c" />
+    <div class="row wrap">
+      <button type="button" class="btn primary" id="loadInactiveFlows">Load inactive versions</button>
+      <button type="button" class="btn" id="scanFlowFieldRefs">Load + scan field refs</button>
+    </div>
+    <input type="search" id="flowCleanFilter" class="input" placeholder="Filter list…" style="margin-top:8px" />
+    <div id="flowCleanList" class="package-members"></div>
+    <div class="row wrap">
+      <button type="button" class="btn" id="selectAllInactiveFlows">Select all</button>
+      <button type="button" class="btn" id="clearInactiveFlows">Clear</button>
+      <button type="button" class="btn danger" id="deleteInactiveFlows">Delete selected</button>
+    </div>
+    <div id="flowCleanStatus" class="hint"></div>
+    <div id="flowCleanOut" class="report"></div>
+  </section>
+
+  <!-- UTIL: Links -->
+  <section id="view-links" class="view">
+    <input type="search" id="linkSearch" class="input" placeholder="Filter quick links…" autocomplete="off" />
+    <div id="linkList" class="link-list"></div>
+  </section>
+
+  <!-- UTIL: SOQL runner + saved library -->
+  <section id="view-soql-run" class="view">
+    <div class="subnav" role="tablist" aria-label="Query">
+      <button type="button" class="subnav-btn" data-open="nl-soql">Plain English</button>
+      <button type="button" class="subnav-btn active" data-open="soql-run">SOQL runner</button>
+    </div>
+    <div class="row wrap" style="margin-bottom:8px">
+      <label class="label tight" for="soqlApiMode">API</label>
+      <select id="soqlApiMode" class="select" title="Standard data objects or Tooling API metadata objects">
+        <option value="rest">Standard objects</option>
+        <option value="tooling">Tooling API</option>
+      </select>
+      <input
+        type="search"
+        id="soqlObjectHint"
+        class="input grow"
+        list="soqlObjectList"
+        placeholder="Object API name"
+        autocomplete="off"
+      />
+      <datalist id="soqlObjectList"></datalist>
+      <button type="button" class="btn" id="soqlLoadFields" title="Load fields for autocomplete">Load fields</button>
+    </div>
+    <p class="hint" id="soqlAssistHint">Field suggestions appear as you type. Standard mode includes custom objects (__c) and custom metadata (__mdt). Use Tooling for metadata entities.</p>
+    <label class="label" for="soqlInput">SOQL</label>
+    <div class="soql-editor">
+      <textarea id="soqlInput" class="textarea" rows="5" placeholder="SELECT Id, Name FROM MyObject__c LIMIT 10" spellcheck="false"></textarea>
+      <div id="soqlSuggest" class="soql-suggest hidden" role="listbox" aria-label="Field suggestions"></div>
+    </div>
+    <div class="row wrap">
+      <select id="apiVersion" class="select" title="API version"></select>
+      <button type="button" class="btn primary" id="runSoql">Run query</button>
+      <button type="button" class="btn" id="saveSoqlBtn">Save to library</button>
+    </div>
+    <div class="row wrap">
+      <input type="text" id="soqlSaveName" class="input grow" placeholder="Name for saved query" maxlength="80" />
+    </div>
+    <div id="soqlQueryPanel" class="query-panel hidden" data-query-panel="soql">
+      <div class="query-toolbar">
+        <span class="query-meta" data-query-meta></span>
+        <button type="button" class="btn" data-export="sheets">Copy for Sheets</button>
+        <button type="button" class="btn" data-export="excel">Export Excel</button>
+        <button type="button" class="btn ghost" data-export="csv">CSV</button>
+        <button type="button" class="btn ghost" data-export="json">JSON</button>
+      </div>
+      <div class="query-table-wrap" data-query-table></div>
+    </div>
+    <div id="soqlQueryStatus" class="query-status"></div>
+
+    <div class="label">Saved SOQL library</div>
+    <p class="hint" id="soqlLibraryHint">Pinned and recent queries for this org. Stored locally in the browser — never includes session.</p>
+    <input type="search" id="soqlLibraryFilter" class="input" placeholder="Filter saved queries…" />
+    <div id="soqlLibraryList" class="package-members"></div>
+  </section>
+
+  <!-- FEATURE: Anonymous Apex -->
+  <section id="view-anon-apex" class="view">
+    <p class="hint">
+      Runs Apex with your current org session via Tooling <code>executeAnonymous</code>.
+      Debug lines need an active Trace Flag; then use Fetch debug log.
+    </p>
+    <label class="label" for="apexSnippet">Snippet</label>
+    <select id="apexSnippet" class="select block-select"></select>
+    <label class="label" for="anonApexInput">Anonymous Apex</label>
+    <textarea id="anonApexInput" class="textarea" rows="10" placeholder="System.debug('hello');"></textarea>
+    <div class="row wrap">
+      <button type="button" class="btn primary" id="runAnonApex">Execute</button>
+      <button type="button" class="btn" id="fetchAnonDebug">Fetch debug log</button>
+      <button type="button" class="btn ghost" id="copyAnonApex">Copy Apex</button>
+    </div>
+    <div id="anonApexResult" class="report"></div>
+    <pre id="anonApexDebug" class="result dim"></pre>
+  </section>
+
+  <!-- UTIL: IDs -->
+  <section id="view-ids" class="view">
+    <div class="row">
+      <input type="text" id="idInput" class="input grow" placeholder="001…" spellcheck="false" />
+      <button type="button" class="btn primary" id="openRecord">Open</button>
+    </div>
+    <div id="idInfo" class="id-info"></div>
+    <div class="row wrap">
+      <button type="button" class="btn" id="copy15">Copy 15</button>
+      <button type="button" class="btn" id="copy18">Copy 18</button>
+      <button type="button" class="btn" id="scanPageIds">Scan page</button>
+    </div>
+    <ul id="scannedIds" class="scanned"></ul>
+  </section>
+
+  <!-- UTIL: Favs -->
+  <section id="view-favs" class="view">
+    <div class="row"><input type="text" id="favLabel" class="input grow" placeholder="Label" /></div>
+    <div class="row">
+      <input type="text" id="favPath" class="input grow" placeholder="Path or full URL" />
+      <button type="button" class="btn primary" id="addFav">Add</button>
+    </div>
+    <ul id="favList" class="fav-list"></ul>
+    <button type="button" class="btn block" id="saveCurrent">Save current page</button>
+  </section>
+
+  <!-- Record detail / edit drawer -->
+  <div id="recordDrawer" class="record-drawer hidden" aria-hidden="true">
+    <div class="record-drawer-backdrop" data-record-close></div>
+    <div class="record-drawer-panel" role="dialog" aria-labelledby="recordDrawerTitle">
+      <div class="record-drawer-header">
+        <div>
+          <div class="label" id="recordDrawerTitle">Record</div>
+          <div class="hint" id="recordDrawerSub"></div>
+        </div>
+        <button type="button" class="btn ghost" data-record-close title="Close">Close</button>
+      </div>
+      <div class="record-drawer-actions row wrap">
+        <button type="button" class="btn" id="recordOpenSf">Open in Salesforce</button>
+        <button type="button" class="btn primary" id="recordSave">Save changes</button>
+        <button type="button" class="btn danger" id="recordDelete">Delete</button>
+      </div>
+      <div id="recordDrawerStatus" class="query-status"></div>
+      <input type="search" id="recordFieldFilter" class="input" placeholder="Filter fields…" />
+      <div id="recordFieldList" class="record-field-list"></div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

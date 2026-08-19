@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en" class="shell-wide">
+<head>
+  <meta charset="UTF-8" />
+  <title>OrgKit</title>
+  <link rel="stylesheet" href="../../../app/app.css" />
+  <style>
+    html, body { width: 1280px; height: 800px; min-height: 800px; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <button type="button" class="brand brand-home">
+      <img class="brand-mark" src="../../../icons/orgkit-32.png?v=1.12.1" alt="" width="32" height="32" />
+      <span>OrgKit</span>
+    </button>
+    <nav class="app-nav">
+      <button type="button" class="app-nav-btn active">Home</button>
+      <button type="button" class="app-nav-btn">Query</button>
+      <button type="button" class="app-nav-btn">Schema</button>
+      <button type="button" class="app-nav-btn">Compare</button>
+      <button type="button" class="app-nav-btn">Apex</button>
+      <button type="button" class="app-nav-btn">More</button>
+    </nav>
+  </header>
+  <section class="org-banner">
+    <div class="org-top">
+      <span class="pill sandbox">Sandbox</span>
+      <span class="org-host">acme--uat.sandbox.my.salesforce.com</span>
+    </div>
+    <div class="org-meta">Active session · UAT</div>
+  </section>
+  <section class="view active" style="display:block">
+    <div class="home-hero">
+      <p class="home-kicker">Salesforce, already open in Chrome</p>
+      <h1>Query, schema, compare, and Apex — in the org you are in</h1>
+      <p>OrgKit uses the Salesforce tab you already logged into. No extra login. Pick one of the four tools.</p>
+    </div>
+    <div class="daily-grid">
+      <button type="button" class="daily-card">
+        <span class="daily-kicker">Query</span>
+        <strong>Find records in English</strong>
+        <span>Describe the rows. OrgKit writes SOQL and can run it in this org.</span>
+      </button>
+      <button type="button" class="daily-card">
+        <span class="daily-kicker">Schema</span>
+        <strong>See how records connect</strong>
+        <span>A map of objects and lookup lines, plus a field list when you need it.</span>
+      </button>
+      <button type="button" class="daily-card">
+        <span class="daily-kicker">Compare</span>
+        <strong>UAT vs Prod, or two flows</strong>
+        <span>What is live in each org, or any two flow versions.</span>
+      </button>
+      <button type="button" class="daily-card">
+        <span class="daily-kicker">Apex</span>
+        <strong>Run anonymous Apex</strong>
+        <span>Execute a snippet in this org and read the debug log.</span>
+      </button>
+    </div>
+    <details class="home-fold" open>
+      <summary>Continue in this org</summary>
+      <div class="wb-grid">
+        <div class="wb-card">
+          <div class="wb-card-head"><h3>Recent</h3></div>
+          <button type="button" class="wb-item"><strong>Query</strong><span>Accounts created this week</span></button>
+        </div>
+        <div class="wb-card">
+          <div class="wb-card-head"><h3>Pinned queries</h3></div>
+          <button type="button" class="wb-item"><strong>Open cases</strong><span>SELECT Id, Subject FROM Case WHERE IsClosed = false</span></button>
+        </div>
+      </div>
+    </details>
+  </section>
+</body>
+</html>

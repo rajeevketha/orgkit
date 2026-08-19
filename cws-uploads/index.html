@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OrgKit — Chrome Web Store uploads</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --card: #161b22;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --border: #30363d;
+    }
+    body {
+      margin: 0;
+      font: 16px/1.5 "Inter", "Segoe UI", system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    main { max-width: 920px; margin: 0 auto; padding: 32px 18px 64px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 28px 0 10px; font-size: 18px; }
+    p, li { color: var(--muted); }
+    a { color: var(--accent); }
+    .warn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 16px 0 24px;
+    }
+    .warn strong { color: var(--text); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 12px 0;
+    }
+    .card img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin: 10px 0;
+      background: #010409;
+    }
+    .icon { width: 128px; height: 128px; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #21262d;
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 650;
+      font-size: 14px;
+    }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    code { color: var(--text); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>OrgKit Chrome Web Store uploads</h1>
+    <p>Open this page and save each file. Chrome’s dashboard does not read images from the extension zip.</p>
+
+    <div class="warn">
+      <strong>Two different uploads</strong>
+      <ul>
+        <li><code>OrgKit-store.zip</code> → Package. Manifest at the zip root. No screenshots inside — that is correct.</li>
+        <li>The PNG files below → Store icon, screenshots, and promo tiles in the Graphics section.</li>
+      </ul>
+    </div>
+
+    <h2>1. Package (the only zip Chrome should get as the extension)</h2>
+    <div class="card">
+      <p>Version 1.12.1. If a zip link does not download, use the GitHub file page and click Download.</p>
+      <div class="row">
+        <a class="btn primary" href="OrgKit-store.zip" download>OrgKit-store.zip (this folder)</a>
+        <a class="btn" href="https://github.com/rajeevketha/orgkit/blob/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-store.zip">GitHub file page</a>
+        <a class="btn" href="https://raw.githubusercontent.com/rajeevketha/orgkit/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-store.zip">Direct zip</a>
+      </div>
+    </div>
+
+    <h2>2. Store icon (128×128)</h2>
+    <div class="card">
+      <p>Chrome Web Store → Store listing → Graphic assets → Store icon. Abstract K. Not the old blue OK tile.</p>
+      <img class="icon" src="store-icon-128.png" alt="OrgKit store icon" width="128" height="128" />
+      <div class="row">
+        <a class="btn primary" href="store-icon-128.png" download>Download store-icon-128.png</a>
+      </div>
+    </div>
+
+    <h2>3. Screenshots (1280×800) — upload in this order</h2>
+    <div class="card">
+      <p>Home</p>
+      <img src="01-home-1280x800.png" alt="Home" />
+      <a class="btn" href="01-home-1280x800.png" download>Download 01-home-1280x800.png</a>
+    </div>
+    <div class="card">
+      <p>Query</p>
+      <img src="02-query-1280x800.png" alt="Query" />
+      <a class="btn" href="02-query-1280x800.png" download>Download 02-query-1280x800.png</a>
+    </div>
+    <div class="card">
+      <p>Schema</p>
+      <img src="03-schema-1280x800.png" alt="Schema" />
+      <a class="btn" href="03-schema-1280x800.png" download>Download 03-schema-1280x800.png</a>
+    </div>
+    <div class="card">
+      <p>Compare</p>
+      <img src="04-compare-1280x800.png" alt="Compare" />
+      <a class="btn" href="04-compare-1280x800.png" download>Download 04-compare-1280x800.png</a>
+    </div>
+    <div class="card">
+      <p>Edge tab (optional)</p>
+      <img src="05-launcher-1280x800.png" alt="On-page launcher" />
+      <a class="btn" href="05-launcher-1280x800.png" download>Download 05-launcher-1280x800.png</a>
+    </div>
+
+    <h2>4. Promo tiles (replace any old light-theme tiles)</h2>
+    <div class="card">
+      <p>Small promo 440×280</p>
+      <img src="small-promo-440x280.png" alt="Small promo" width="440" height="280" />
+      <a class="btn" href="small-promo-440x280.png" download>Download small-promo-440x280.png</a>
+    </div>
+    <div class="card">
+      <p>Marquee 1400×560</p>
+      <img src="marquee-promo-1400x560.png" alt="Marquee promo" />
+      <a class="btn" href="marquee-promo-1400x560.png" download>Download marquee-promo-1400x560.png</a>
+    </div>
+
+    <p>Folder on GitHub: <a href="https://github.com/rajeevketha/orgkit/tree/cursor/highlight-nl-soql-1d8c/cws-uploads">cws-uploads</a></p>
+  </main>
+</body>
+</html>

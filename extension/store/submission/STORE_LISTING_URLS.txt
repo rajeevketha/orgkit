@@ -1,0 +1,43 @@
+================================================================================
+OrgKit — Chrome Web Store public URLs
+================================================================================
+
+Item name
+  OrgKit
+
+Official URL
+  None
+
+Homepage URL
+  https://rajeevketha.github.io/orgkit/
+
+Support URL
+  https://github.com/rajeevketha/orgkit/issues
+
+Privacy policy URL
+  https://rajeevketha.github.io/orgkit/privacy.html
+
+Mature content
+  Off
+
+================================================================================
+GITHUB PAGES (must match the listing before you submit)
+================================================================================
+
+Chrome Web Store reviewers open the homepage and privacy URLs. They must describe
+the current product (Query / Schema / Compare / Apex), not the old Session Workbench copy.
+
+GitHub Pages for this repo is currently set to branch:
+  cursor/orgkit-org-compare-2ff7   folder: /
+
+After this PR is merged, switch Pages to `main` (folder /) in:
+  https://github.com/rajeevketha/orgkit/settings/pages
+
+Until then, the homepage files on that Pages branch must stay in sync with this
+branch’s `index.html` and `privacy.html`.
+
+Verify in Incognito before submit:
+  https://rajeevketha.github.io/orgkit/
+  https://rajeevketha.github.io/orgkit/privacy.html
+
+Do NOT use chromeplugins or orgcomparision in the public store listing.
