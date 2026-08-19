@@ -285,6 +285,7 @@ async function init() {
   });
   renderFeatureGrid();
   bindNav();
+  bindWhatsNew();
   bindNlExamples();
   bindSchemaExplorer();
   bindWorkbench();
@@ -395,6 +396,33 @@ function bindNav() {
   document.querySelectorAll("[data-open]").forEach((btn) => {
     btn.addEventListener("click", () => showView(btn.getAttribute("data-open")));
   });
+}
+
+function bindWhatsNew() {
+  const card = $("#whatsNew");
+  const dismiss = $("#whatsNewDismiss");
+  if (!card || !dismiss) return;
+  const hide = async () => {
+    card.hidden = true;
+    card.classList.add("hidden");
+    try {
+      await chrome.storage.local.remove("whatsNew");
+    } catch {
+      /* capture pages */
+    }
+  };
+  dismiss.addEventListener("click", () => {
+    hide().catch(() => {});
+  });
+  try {
+    chrome.storage.local.get({ whatsNew: null }).then((data) => {
+      if (!data?.whatsNew) return;
+      card.hidden = false;
+      card.classList.remove("hidden");
+    }).catch(() => {});
+  } catch {
+    /* capture pages have no chrome.storage */
+  }
 }
 
 function navKeyForView(id) {

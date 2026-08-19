@@ -174,6 +174,27 @@ button.brand-home {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent-soft);
 }
+.whats-new {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.whats-new .home-kicker { margin-bottom: 4px; }
+.whats-new p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 62ch;
+}
+.whats-new .btn { flex: 0 0 auto; }
+.whats-new.hidden { display: none; }
 .home-hero {
   margin: 0 0 16px;
   padding: 20px 22px;

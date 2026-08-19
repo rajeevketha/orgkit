@@ -59,6 +59,12 @@ SINGLE PURPOSE
 OrgKit lets Salesforce developers query data, read schema, compare two orgs or flow versions, and run anonymous Apex in the org already open in Chrome, using the browser Salesforce session from a logged-in tab.
 
 ================================================================================
+WHAT’S NEW IN THIS VERSION  (Chrome Web Store dashboard — “What’s new”)
+================================================================================
+
+Dark theme and a new K mark. Same four tools: Query, Schema, Compare, Apex. Chrome updates this in place — you do not install a second copy.
+
+================================================================================
 PUBLIC URLS (Chrome Web Store — OrgKit)
 ================================================================================
 

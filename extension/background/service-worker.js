@@ -45,6 +45,14 @@ function applyToolbarIcon() {
 
 chrome.runtime.onInstalled.addListener((details) => {
   applyToolbarIcon();
+  if (details.reason === "update") {
+    chrome.storage.local.set({
+      whatsNew: {
+        from: String(details.previousVersion || ""),
+        to: chrome.runtime.getManifest().version
+      }
+    });
+  }
   chrome.storage.sync.get(
     {
       favorites: [],
@@ -134,7 +142,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     executeAnonymous: () => executeAnonymous(message.tabUrl, message.apex, message.apiVersion),
     fetchLatestApexDebug: () => fetchLatestApexDebug(message.tabUrl, message.apiVersion),
     getExtensionVersion: async () => ({
-      version: "1.12.1",
+      version: chrome.runtime.getManifest().version,
       hasSearchMetadata: typeof searchMetadata === "function",
       hasFlowCleaner: typeof listInactiveFlowVersions === "function",
       hasExecuteAnonymous: typeof executeAnonymous === "function",

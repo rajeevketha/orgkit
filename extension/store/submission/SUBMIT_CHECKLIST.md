@@ -15,6 +15,7 @@ Upload graphics from `screenshots/` and `promo/` in this folder. Do **not** uplo
 - [ ] Item name: **OrgKit**
 - [ ] Paste short + detailed description from `LISTING_COPY.txt`
 - [ ] Category: **Productivity** · Language: **English (United States)**
+- [ ] Paste “What’s new in this version” from `LISTING_COPY.txt` (Store users see this on the listing; Chrome still auto-updates the installed copy)
 - [ ] Homepage / Support / Privacy URLs from `STORE_LISTING_URLS.txt`
 - [ ] Privacy policy URL: `https://rajeevketha.github.io/orgkit/privacy.html`
 - [ ] Icon: `extension/icons/orgkit-128.png` (abstract K on dark tile — not the old blue OK)

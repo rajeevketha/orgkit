@@ -34,6 +34,9 @@ Full-tab UI: app/index.html (legacy popup/popup.html redirects here).
 OrgFlow dark theme (GitHub canvas). Abstract K mark. Home highlights the
 four daily tools.
 
+On upgrade, Home shows a one-time note that Chrome updated OrgKit in place
+(same extension; new dark theme + K mark). Users do not install a second copy.
+
 Privacy policy
 --------------
 https://rajeevketha.github.io/orgkit/privacy.html
