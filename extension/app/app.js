@@ -278,6 +278,7 @@ const $ = (sel) => document.querySelector(sel);
 init();
 
 async function init() {
+  applyFavicon();
   await applyShellMode();
   window.addEventListener("resize", () => {
     applyShellMode();
@@ -327,6 +328,20 @@ function paintLaunchSessionPlaceholder() {
 /**
  * Action popups stay compact; opening app/index.html as a Chrome tab fills the window.
  */
+function applyFavicon() {
+  try {
+    const href = `${chrome.runtime.getURL("icons/orgkit-32.png")}?v=${chrome.runtime.getManifest().version}`;
+    document.querySelectorAll("link[rel*='icon']").forEach((el) => el.remove());
+    const link = document.createElement("link");
+    link.rel = "icon";
+    link.type = "image/png";
+    link.href = href;
+    document.head.appendChild(link);
+  } catch {
+    // file:// capture pages have no chrome.runtime
+  }
+}
+
 async function applyShellMode() {
   let asTab = false;
   try {

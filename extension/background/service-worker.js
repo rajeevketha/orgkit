@@ -33,7 +33,18 @@ import {
   FLOW_COMPARE_ATTR_KEYS
 } from "../lib/org-compare.js";
 
+function applyToolbarIcon() {
+  chrome.action.setIcon({
+    path: {
+      16: "icons/orgkit-16.png",
+      32: "icons/orgkit-32.png",
+      48: "icons/orgkit-48.png"
+    }
+  }).catch(() => {});
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
+  applyToolbarIcon();
   chrome.storage.sync.get(
     {
       favorites: [],
@@ -54,6 +65,8 @@ chrome.runtime.onInstalled.addListener((details) => {
     }
   );
 });
+
+chrome.runtime.onStartup.addListener(() => applyToolbarIcon());
 
 /** Toolbar icon / Alt+Shift+O → open OrgKit in a full tab (not a tiny popup). */
 chrome.action.onClicked.addListener((tab) => {
@@ -121,7 +134,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     executeAnonymous: () => executeAnonymous(message.tabUrl, message.apex, message.apiVersion),
     fetchLatestApexDebug: () => fetchLatestApexDebug(message.tabUrl, message.apiVersion),
     getExtensionVersion: async () => ({
-      version: "1.12.0",
+      version: "1.12.1",
       hasSearchMetadata: typeof searchMetadata === "function",
       hasFlowCleaner: typeof listInactiveFlowVersions === "function",
       hasExecuteAnonymous: typeof executeAnonymous === "function",

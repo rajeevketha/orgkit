@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="#ffffff" aria-hidden="true">
-  <rect x="33" y="29" width="17" height="70" rx="8.5"/>
-  <path d="M57 42.2c0-4.7 3.8-8.5 8.5-8.5s8.5 3.8 8.5 8.5v40.3c0 4.7-3.8 8.5-8.5 8.5s-8.5-3.8-8.5-8.5V42.2z"/>
-  <path d="M57 42.2 65.5 24 74 42.2z"/>
-  <g transform="rotate(48 86.5 84)">
-    <rect x="78" y="63" width="17" height="42" rx="8.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="OrgKit">
+  <rect width="128" height="128" rx="28" fill="#0d1117"/>
+  <rect x="30" y="26" width="18" height="76" rx="9" fill="#fff"/>
+  <path fill="#fff" d="M56 40.5 65 22 74 40.5V92.5a9 9 0 0 1-18 0Z"/>
+  <g transform="rotate(-42 84 86)">
+    <rect x="75" y="64" width="18" height="44" rx="9" fill="#fff"/>
   </g>
 </svg>

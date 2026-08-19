@@ -277,11 +277,11 @@ button.brand-home {
 .home-fold .wb-scratch { margin: 0; border: 0; padding: 0; background: transparent; }
 
 .brand-mark {
-  width: 28px;
-  height: 28px;
-  color: #fff;
+  width: 32px;
+  height: 32px;
   display: block;
   flex: 0 0 auto;
+  border-radius: 8px;
 }
 
 .brand span {

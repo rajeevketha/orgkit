@@ -4,7 +4,7 @@ Chrome extension for Salesforce developers. Work in the org **already open in Ch
 
 ## Version
 
-**1.12.0**
+**1.12.1**
 
 ## Daily work
 
