@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OrgKit — Salesforce developer toolkit</title>
+  <meta name="description" content="OrgKit is a Chrome extension for Salesforce developers: Query, Schema, Compare, and Apex in the org already open in Chrome. Session in-browser only." />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --card: #161b22;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --ink: #f0f6fc;
+      --border: #30363d;
+    }
+    body {
+      margin: 0;
+      font: 16px/1.55 "Inter", "Segoe UI", system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      min-height: 100vh;
+    }
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 48px 20px 64px;
+    }
+    .brand {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0 0 8px;
+      color: var(--ink);
+    }
+    .lede {
+      color: var(--muted);
+      font-size: 18px;
+      margin: 0 0 28px;
+      max-width: 38em;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 24px;
+      margin-bottom: 16px;
+    }
+    h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      color: var(--ink);
+    }
+    ul {
+      margin: 0;
+      padding-left: 1.2em;
+      color: var(--muted);
+    }
+    li { margin: 4px 0; }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 650;
+    }
+    a:hover { text-decoration: underline; }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-weight: 700;
+    }
+    .btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    footer {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 class="brand">OrgKit</h1>
+    <p class="lede">
+      Daily Salesforce work in the org already open in Chrome — Query, Schema, Compare, Apex.
+      Uses your tab session in the browser only. No extra login.
+    </p>
+
+    <section class="card">
+      <h2>What you use every day</h2>
+      <ul>
+        <li><strong>Query</strong> — plain English or SOQL against this org</li>
+        <li><strong>Schema</strong> — how record types connect, plus field describe</li>
+        <li><strong>Compare</strong> — UAT vs Prod, or any two flow versions</li>
+        <li><strong>Apex</strong> — anonymous Apex and debug output</li>
+      </ul>
+      <div class="actions">
+        <a class="btn primary" href="https://chrome.google.com/webstore/detail/addepnaekmgolifoifhhmloboifelnb">Chrome Web Store</a>
+        <a class="btn" href="privacy.html">Privacy policy</a>
+        <a class="btn" href="https://github.com/rajeevketha/orgkit/issues">Support</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Already installed?</h2>
+      <ul>
+        <li>If you installed OrgKit from the <strong>Chrome Web Store</strong>, Chrome updates it on this computer. You do not install a second copy.</li>
+        <li>After the Store publishes a new version, Chrome usually applies it within a few hours. You can also open <code>chrome://extensions</code> and click <strong>Update</strong>.</li>
+        <li>If you loaded an <strong>unpacked zip</strong> for testing, that copy does not auto-update. Remove it after you install from the Store, so you only have one OrgKit.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Privacy</h2>
+      <ul>
+        <li>No OrgKit backend collecting your org data</li>
+        <li>Uses the Salesforce session already open in Chrome</li>
+        <li>Never stores <code>sid</code></li>
+      </ul>
+    </section>
+
+    <footer>
+      OrgKit · in-browser Salesforce toolkit
+    </footer>
+  </main>
+</body>
+</html>

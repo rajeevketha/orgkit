@@ -1,0 +1,50 @@
+================================================================================
+Notes for Chrome Web Store reviewers — OrgKit 1.8.2
+================================================================================
+
+Single purpose
+--------------
+OrgKit is a Salesforce developer productivity extension. It helps users work in an
+org they already logged into in Chrome (SOQL/Tooling, describe/metadata including
+custom objects, dual-org Org Compare, Apex/flow helpers). It is not a general web
+scraper, ad tool, or credential harvester.
+
+Session model (aligned with Salesforce Inspector Reloaded)
+----------------------------------------------------------
+OrgKit reuses the browser Salesforce session cookie (sid) on Salesforce domains only,
+then calls official Salesforce REST/Tooling APIs for user-started actions.
+
+Org Compare
+-----------
+Compares inventories between two logged-in orgs selected from open Salesforce tabs
+(across Chrome windows in the same profile) or cookie-backed sessions. Never stores
+sid; only remembers last A/B org keys locally if the user used Org Compare.
+
+Lean permissions
+----------------
+Required: cookies, storage.
+Host permissions: Salesforce domains only.
+Optional: OpenAI hosts if the user enables AI.
+Does NOT request tabs, activeTab, or scripting.
+
+UI entry point
+--------------
+Full-tab UI: app/index.html (legacy popup/popup.html redirects here).
+
+Privacy policy
+--------------
+https://rajeevketha.github.io/orgkit/privacy.html
+
+How to test
+-----------
+1. Install the uploaded package.
+2. Sign in to a Salesforce sandbox / Developer Edition (optionally a second org in
+   another tab or Chrome window).
+3. Open OrgKit from the toolbar (or Alt+Shift+O).
+4. Confirm Session: connected; home shows Session Workbench.
+5. SOQL on a standard or custom object; Describe search by label/API name.
+6. Org Compare → Refresh sessions → Set as A / Set as B → Compare (objects/profiles).
+7. On-page OrgKit tab Hide → Show restores it.
+
+Destructive actions require confirmation. Active flow versions are never deleted
+by the cleaner. Screenshots use fictional demo org data.

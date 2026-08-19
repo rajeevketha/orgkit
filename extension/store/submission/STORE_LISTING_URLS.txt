@@ -1,0 +1,44 @@
+================================================================================
+OrgKit — Chrome Web Store public URLs
+================================================================================
+
+Item name
+  OrgKit
+
+Official URL
+  None
+
+Homepage URL
+  https://rajeevketha.github.io/orgkit/
+
+Support URL
+  https://github.com/rajeevketha/orgkit/issues
+
+Privacy policy URL
+  https://rajeevketha.github.io/orgkit/privacy.html
+
+Mature content
+  Off
+
+================================================================================
+ONE-TIME SETUP (do this before submit — makes URLs say "orgkit")
+================================================================================
+
+1) Rename GitHub repo to orgkit
+   Open: https://github.com/rajeevketha/orgcomparision/settings
+   → Repository name → change to: orgkit → Rename
+
+2) Enable GitHub Pages
+   Open: https://github.com/rajeevketha/orgkit/settings/pages
+   → Build and deployment → Deploy from a branch
+   → Branch: main (or cursor/orgkit-org-compare-2ff7 if not merged yet)
+   → Folder: / (root)
+   → Save
+
+3) Wait 1–2 minutes, then verify in Incognito:
+   https://rajeevketha.github.io/orgkit/
+   https://rajeevketha.github.io/orgkit/privacy.html
+
+4) Paste the URLs above into the Chrome Web Store listing and Save draft.
+
+Do NOT use chromeplugins or orgcomparision in the public store listing.

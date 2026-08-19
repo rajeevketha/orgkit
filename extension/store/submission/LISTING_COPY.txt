@@ -1,0 +1,80 @@
+================================================================================
+Chrome Web Store — OrgKit listing copy (paste into Developer Dashboard)
+Version covered: 1.8.2
+================================================================================
+
+LANGUAGE
+  English (United States)
+
+CATEGORY
+  Productivity
+  (Secondary/tags if asked: Developer Tools, Salesforce)
+
+================================================================================
+SHORT DESCRIPTION  (max 132 characters — count carefully)
+================================================================================
+
+Salesforce toolkit: Session Workbench, Org Compare, SOQL, schema, Apex. Uses your open org tab session only.
+
+Character count: 113
+
+================================================================================
+DETAILED DESCRIPTION
+================================================================================
+
+OrgKit is a productivity toolkit for Salesforce developers and admins.
+
+What it does
+• Session Workbench home — quick launch, continue recent work, pinned SOQL, per-org scratch pad
+• Org Compare — dual-org drift check for objects/fields, profiles, permission sets, flows, Apex, validation rules, and related metadata
+• SOQL / Tooling runner with field autocomplete and a saved query library
+• Open query results in Lightning; show all data to view fields; update/delete with confirmation
+• Describe browser for standard and custom objects (fields + dependent picklists)
+• Metadata quick open, package.xml builder
+• Inactive flow version cleaner (Active versions are never deleted)
+• NL→SOQL for standard objects, custom objects, custom metadata, and Tooling entities
+• Apex review, governor heuristics, error/log helpers, permission investigator
+
+How authentication works
+OrgKit does not ask you to type a password into the extension. It uses the Salesforce session cookie from a Salesforce tab you already logged into in Chrome, only to call Salesforce APIs for actions you start. The session stays in your browser. This is the same session model used by tools such as Salesforce Inspector Reloaded.
+
+Org Compare picks orgs from open Salesforce tabs across Chrome windows (same profile) and optional cookie sessions. It never stores sid.
+
+Privacy & permissions
+• No OrgKit backend collecting org data
+• Session id is not written to sync storage and is not sent to AI providers
+• Optional AI sends only the text you paste, to the endpoint you configure
+• Full policy: https://rajeevketha.github.io/orgkit/privacy.html
+
+Permissions (summary)
+• cookies — Salesforce sid on Salesforce domains only
+• storage — settings, favorites, saved SOQL, workbench history/scratch, last Org Compare A/B org keys (never stores sid)
+• Host permissions — Salesforce domains only; OpenAI hosts are optional
+• Does not request tabs, activeTab, or scripting
+
+================================================================================
+SINGLE PURPOSE
+================================================================================
+
+OrgKit helps Salesforce developers work in their open org: run SOQL/Tooling queries, inspect schema/metadata (including custom objects), compare drift between two logged-in orgs, review Apex/flows, and open records — using the browser Salesforce session already available in a logged-in tab.
+
+================================================================================
+PUBLIC URLS (Chrome Web Store — OrgKit)
+================================================================================
+
+Homepage URL
+  https://rajeevketha.github.io/orgkit/
+
+Support URL
+  https://github.com/rajeevketha/orgkit/issues
+
+Official URL
+  None
+
+Privacy policy URL
+  https://rajeevketha.github.io/orgkit/privacy.html
+
+Notes
+  - Product name is OrgKit.
+  - First rename the GitHub repo to orgkit and enable Pages (see STORE_LISTING_URLS.txt).
+  - Confirm privacy URL opens in Incognito before submit.
