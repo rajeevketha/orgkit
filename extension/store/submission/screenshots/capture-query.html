@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" class="shell-wide">
+<head>
+  <meta charset="UTF-8" />
+  <title>Query · OrgKit</title>
+  <link rel="stylesheet" href="../../../app/app.css" />
+  <style>
+    html, body { width: 1280px; height: 800px; min-height: 800px; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <button type="button" class="brand brand-home">
+      <img src="../../../icons/icon32.png" alt="" width="20" height="20" />
+      <span>OrgKit</span>
+    </button>
+    <nav class="app-nav">
+      <button type="button" class="app-nav-btn">Home</button>
+      <button type="button" class="app-nav-btn active">Query</button>
+      <button type="button" class="app-nav-btn">Schema</button>
+      <button type="button" class="app-nav-btn">Compare</button>
+      <button type="button" class="app-nav-btn">Apex</button>
+      <button type="button" class="app-nav-btn">More</button>
+    </nav>
+  </header>
+  <section class="org-banner">
+    <div class="org-top">
+      <span class="pill sandbox">Sandbox</span>
+      <span class="org-host">acme--uat.sandbox.my.salesforce.com</span>
+    </div>
+  </section>
+  <section class="view active" style="display:block">
+    <div class="subnav">
+      <button type="button" class="subnav-btn active">Plain English</button>
+      <button type="button" class="subnav-btn">SOQL runner</button>
+    </div>
+    <p class="lede nl-view-lede">Describe the rows you need. OrgKit writes SOQL for this org and can run it.</p>
+    <div class="nl-examples">
+      <button type="button" class="nl-chip">Accounts this week + owner</button>
+      <button type="button" class="nl-chip">High-priority Cases</button>
+      <button type="button" class="nl-chip">Recent custom objects</button>
+    </div>
+    <label class="label" for="nlInput">Describe the data you need</label>
+    <textarea class="textarea" rows="3">Accounts created this week with their owner name</textarea>
+    <div class="row">
+      <button type="button" class="btn primary">Generate SOQL</button>
+      <button type="button" class="btn">Run</button>
+      <button type="button" class="btn">Copy SOQL</button>
+    </div>
+    <pre class="result is-ok">SELECT Id, Name, Owner.Name, CreatedDate
+FROM Account
+WHERE CreatedDate = THIS_WEEK
+ORDER BY CreatedDate DESC
+LIMIT 200</pre>
+    <div class="query-panel" style="display:flex">
+      <div class="query-toolbar">
+        <span class="query-meta">4 rows · Account</span>
+        <button type="button" class="btn">Copy for Sheets</button>
+        <button type="button" class="btn">Export Excel</button>
+      </div>
+      <div class="query-table-wrap">
+        <table class="query-table">
+          <thead><tr><th>Name</th><th>Owner.Name</th><th>CreatedDate</th></tr></thead>
+          <tbody>
+            <tr><td>Acme North</td><td>Jordan Lee</td><td>2026-08-17</td></tr>
+            <tr><td>Northwind Traders</td><td>Sam Patel</td><td>2026-08-16</td></tr>
+            <tr><td>Global Media</td><td>Riley Chen</td><td>2026-08-15</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</body>
+</html>

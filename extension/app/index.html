@@ -14,7 +14,7 @@
       <img src="../icons/icon32.png" alt="" width="20" height="20" />
       <span>OrgKit</span>
     </button>
-    <nav class="app-nav" aria-label="Daily work">
+    <nav class="app-nav" aria-label="OrgKit">
       <button type="button" class="app-nav-btn" data-nav="home" data-open="home">Home</button>
       <button type="button" class="app-nav-btn" data-nav="nl-soql" data-open="nl-soql">Query</button>
       <button type="button" class="app-nav-btn" data-nav="schema" data-open="schema">Schema</button>
@@ -40,89 +40,99 @@
 
   <!-- SESSION WORKBENCH (home) -->
   <section id="view-home" class="view active">
-    <p class="lede">Work in the Salesforce org already open in Chrome. Switch Active session when you have more than one tab.</p>
+    <div class="home-hero">
+      <p class="home-kicker">Salesforce, already open in Chrome</p>
+      <h1>Query, schema, compare, and Apex — in the org you are in</h1>
+      <p>OrgKit uses the Salesforce tab you already logged into. No extra login. Pick one of the four tools.</p>
+    </div>
 
     <div class="daily-grid" id="wbLaunch">
       <button type="button" class="daily-card" data-open="nl-soql">
-        <strong>Query</strong>
-        <span>Ask in English or run SOQL against this org</span>
+        <span class="daily-kicker">Query</span>
+        <strong>Find records in English</strong>
+        <span>Describe the rows. OrgKit writes SOQL and can run it in this org.</span>
       </button>
       <button type="button" class="daily-card" data-open="schema">
-        <strong>Schema</strong>
-        <span>See how record types connect</span>
+        <span class="daily-kicker">Schema</span>
+        <strong>See how records connect</strong>
+        <span>A map of objects and lookup lines, plus a field list when you need it.</span>
       </button>
       <button type="button" class="daily-card" data-open="org-compare">
-        <strong>Compare</strong>
-        <span>UAT vs Prod, or any two flow versions</span>
+        <span class="daily-kicker">Compare</span>
+        <strong>UAT vs Prod, or two flows</strong>
+        <span>What is live in each org, or any two flow versions.</span>
       </button>
       <button type="button" class="daily-card" data-open="anon-apex">
-        <strong>Apex</strong>
-        <span>Run anonymous Apex and read the debug log</span>
+        <span class="daily-kicker">Apex</span>
+        <strong>Run anonymous Apex</strong>
+        <span>Execute a snippet in this org and read the debug log.</span>
       </button>
     </div>
-    <div class="daily-row">
-      <button type="button" class="btn" data-open="soql-run">SOQL runner</button>
-      <button type="button" class="btn" data-open="describe">Describe</button>
-      <button type="button" class="btn" data-open="meta-open">Open metadata</button>
-      <button type="button" class="btn" data-open="ids">Record / ID</button>
-      <button type="button" class="btn ghost" data-open="more">More tools</button>
-    </div>
 
-    <div class="wb-grid">
-      <div class="wb-card">
+    <details class="home-fold" open>
+      <summary>Continue in this org</summary>
+      <div class="wb-grid">
+        <div class="wb-card">
+          <div class="wb-card-head">
+            <h3>Recent</h3>
+            <button type="button" class="linkish" id="wbClearContinue" title="Clear continue list">Clear</button>
+          </div>
+          <p class="hint wb-hint">Saved in this browser only.</p>
+          <div id="wbContinue" class="wb-list"></div>
+        </div>
+        <div class="wb-card">
+          <div class="wb-card-head">
+            <h3>Pinned queries</h3>
+            <button type="button" class="linkish" data-open="soql-run">Library</button>
+          </div>
+          <p class="hint wb-hint">From your SOQL library for this org.</p>
+          <div id="wbPinned" class="wb-list"></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="home-fold">
+      <summary>Scratch pad</summary>
+      <div class="wb-card wb-scratch">
         <div class="wb-card-head">
-          <h3>Continue</h3>
-          <button type="button" class="linkish" id="wbClearContinue" title="Clear continue list">Clear</button>
+          <h3>Notes for this org</h3>
+          <span class="hint" id="wbScratchHint">Saved in this browser</span>
         </div>
-        <p class="hint wb-hint">Recent work in this org (saved in this browser only).</p>
-        <div id="wbContinue" class="wb-list"></div>
-      </div>
-      <div class="wb-card">
-        <div class="wb-card-head">
-          <h3>Pinned for this org</h3>
-          <button type="button" class="linkish" data-open="soql-run">Library</button>
+        <div class="wb-scratch-grid">
+          <div>
+            <label class="label" for="wbScratchSoql">SOQL</label>
+            <textarea id="wbScratchSoql" class="textarea" rows="4" placeholder="SELECT Id, Name FROM Account LIMIT 10" spellcheck="false"></textarea>
+            <button type="button" class="btn" id="wbOpenScratchSoql">Open in SOQL Runner</button>
+          </div>
+          <div>
+            <label class="label" for="wbScratchApex">Anonymous Apex</label>
+            <textarea id="wbScratchApex" class="textarea" rows="4" placeholder="System.debug('hello');" spellcheck="false"></textarea>
+            <button type="button" class="btn" id="wbOpenScratchApex">Open in Anon Apex</button>
+          </div>
         </div>
-        <p class="hint wb-hint">Pinned queries from your SOQL library.</p>
-        <div id="wbPinned" class="wb-list"></div>
       </div>
-    </div>
+    </details>
 
-    <div class="wb-card wb-scratch">
-      <div class="wb-card-head">
-        <h3>Scratch pad</h3>
-        <span class="hint" id="wbScratchHint">Saved per org in this browser</span>
+    <details class="home-fold">
+      <summary>Privacy</summary>
+      <div class="trust-card">
+        <strong>What OrgKit can see</strong>
+        <ul>
+          <li>Uses your open Salesforce tab session in the browser only — OrgKit does not upload your <code>sid</code>.</li>
+          <li>History, scratch pad, last Org Compare pair, and the active session stay in this browser (org keys only — never <code>sid</code>).</li>
+          <li>Deletes and saves ask for confirmation before changing org data.</li>
+        </ul>
+        <p class="trust-links">
+          <a href="../privacy.html" target="_blank" rel="noopener">Privacy policy</a>
+          ·
+          <button type="button" class="linkish" id="homeOpenSettings">Settings</button>
+        </p>
       </div>
-      <div class="wb-scratch-grid">
-        <div>
-          <label class="label" for="wbScratchSoql">SOQL</label>
-          <textarea id="wbScratchSoql" class="textarea" rows="4" placeholder="SELECT Id, Name FROM Account LIMIT 10" spellcheck="false"></textarea>
-          <button type="button" class="btn" id="wbOpenScratchSoql">Open in SOQL Runner</button>
-        </div>
-        <div>
-          <label class="label" for="wbScratchApex">Anonymous Apex</label>
-          <textarea id="wbScratchApex" class="textarea" rows="4" placeholder="System.debug('hello');" spellcheck="false"></textarea>
-          <button type="button" class="btn" id="wbOpenScratchApex">Open in Anon Apex</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="trust-card">
-      <strong>Privacy &amp; data access</strong>
-      <ul>
-        <li>Uses your open Salesforce tab session in the browser only — OrgKit does not upload your <code>sid</code>.</li>
-        <li>Workbench history, scratch pad, last Org Compare A/B pair, and the active session choice stay in local browser storage (org keys only — never <code>sid</code>).</li>
-        <li>Deletes and saves ask for confirmation before changing org data.</li>
-      </ul>
-      <p class="trust-links">
-        <a href="../privacy.html" target="_blank" rel="noopener">Privacy policy</a>
-        ·
-        <button type="button" class="linkish" id="homeOpenSettings">Settings</button>
-      </p>
-    </div>
+    </details>
   </section>
 
   <section id="view-more" class="view">
-    <p class="lede">Occasional tools. Daily work is Query, Schema, Compare, and Apex.</p>
+    <p class="lede">Extra tools. Everyday work is Query, Schema, Compare, and Apex on Home.</p>
     <div class="feature-grid" id="featureGrid"></div>
     <div class="extras">
       <div class="label" style="margin-top:0">Utilities</div>
@@ -290,8 +300,7 @@
       <button type="button" class="subnav-btn" data-open="describe">Field list</button>
     </div>
     <p class="lede">
-      A map of your Salesforce records — each tile is one type of record, and lines show how they connect.
-      Drag any tile to move just that tile. Switch to <strong>Technical</strong> for API names and SOQL.
+      Search a record type. Tiles are objects; lines are lookups. Drag a tile to move it. Use <strong>Technical</strong> for API names.
     </p>
     <div class="schema-filter-row" role="group" aria-label="Object type filter">
       <button type="button" class="schema-filter active" data-schema-filter="all">All</button>
@@ -359,11 +368,9 @@
 
   <!-- FEATURE: Org Compare -->
   <section id="view-org-compare" class="view">
-    <p class="hint">
-      Compare two logged-in Salesforce orgs, or two versions of one flow.
-      <strong>Scan orgs</strong> is inventory drift (including which flow version is live).
-      <strong>Two flow versions</strong> lets you pick any versions — same org or two orgs.
-      No passwords; <code>sid</code> is never stored.
+    <p class="lede">
+      Pick two Salesforce sessions, then either scan what is live in each org, or compare two flow versions.
+      No extra login. <code>sid</code> is never stored.
     </p>
 
     <div class="compare-chooser">

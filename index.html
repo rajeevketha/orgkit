@@ -7,32 +7,20 @@
   <meta name="description" content="OrgKit is a Chrome extension for Salesforce developers: Query, Schema, Compare, and Apex in the org already open in Chrome. Session in-browser only." />
   <style>
     :root {
-      color-scheme: light dark;
-      --bg: #0b1624;
-      --card: #122033;
-      --text: #e8eef6;
-      --muted: #9bb0c7;
-      --accent: #3b82f6;
-      --border: #2a4a6b;
-    }
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg: #f7fafc;
-        --card: #ffffff;
-        --text: #15202b;
-        --muted: #4a5d73;
-        --accent: #1f6feb;
-        --border: #d7e0ea;
-      }
+      color-scheme: light;
+      --bg: #f3f3f3;
+      --card: #ffffff;
+      --text: #181818;
+      --muted: #706e6b;
+      --accent: #0176d3;
+      --ink: #032d60;
+      --border: #c9c9c9;
     }
     body {
       margin: 0;
-      font: 16px/1.55 system-ui, -apple-system, Segoe UI, sans-serif;
+      font: 16px/1.55 "Salesforce Sans", "Segoe UI", system-ui, sans-serif;
       color: var(--text);
-      background:
-        radial-gradient(900px 420px at 10% -10%, rgba(59, 130, 246, 0.22), transparent 60%),
-        radial-gradient(700px 360px at 90% 0%, rgba(15, 118, 110, 0.18), transparent 55%),
-        var(--bg);
+      background: var(--bg);
       min-height: 100vh;
     }
     main {
@@ -45,6 +33,7 @@
       font-weight: 800;
       letter-spacing: -0.03em;
       margin: 0 0 8px;
+      color: var(--ink);
     }
     .lede {
       color: var(--muted);
@@ -62,6 +51,7 @@
     h2 {
       margin: 0 0 10px;
       font-size: 18px;
+      color: var(--ink);
     }
     ul {
       margin: 0;

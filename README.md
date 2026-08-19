@@ -4,7 +4,7 @@ Chrome extension for Salesforce developers. Work in the org **already open in Ch
 
 ## Version
 
-**1.10.0**
+**1.11.0**
 
 ## Daily work
 
@@ -12,9 +12,8 @@ Chrome extension for Salesforce developers. Work in the org **already open in Ch
 - **Schema** — relationship map + field describe
 - **Compare** — UAT vs Prod inventories, live flow versions, or any two flow versions (same org or two orgs)
 - **Apex** — anonymous Apex + debug output
-- **Home** — continue recent work, pinned queries, per-org scratch pad
 
-The Salesforce edge tab opens the same four tools. Active session switches among logged-in orgs.
+Home highlights those four tools. Recent work and a scratch pad stay folded underneath. The Salesforce edge tab opens the same four tools.
 
 ## Also included (More)
 
@@ -36,6 +35,7 @@ Inactive flow versions, package.xml, permissions, metadata jump, record/ID tools
 ## Chrome Web Store pack
 
 - Upload zip: [`extension/releases/OrgKit-store.zip`](extension/releases/OrgKit-store.zip)
+- Listing copy + screenshots: [`extension/store/submission/`](extension/store/submission/)
 - Rebuild: `bash extension/scripts/pack-release.sh`
 
 ## License

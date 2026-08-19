@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en" class="shell-wide">
+<head>
+  <meta charset="UTF-8" />
+  <title>Schema · OrgKit</title>
+  <link rel="stylesheet" href="../../../app/app.css" />
+  <style>
+    html, body { width: 1280px; height: 800px; min-height: 800px; overflow: hidden; }
+    .schema-viewport { height: 520px; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <button type="button" class="brand brand-home">
+      <img src="../../../icons/icon32.png" alt="" width="20" height="20" />
+      <span>OrgKit</span>
+    </button>
+    <nav class="app-nav">
+      <button type="button" class="app-nav-btn">Home</button>
+      <button type="button" class="app-nav-btn">Query</button>
+      <button type="button" class="app-nav-btn active">Schema</button>
+      <button type="button" class="app-nav-btn">Compare</button>
+      <button type="button" class="app-nav-btn">Apex</button>
+      <button type="button" class="app-nav-btn">More</button>
+    </nav>
+  </header>
+  <section class="org-banner">
+    <div class="org-top">
+      <span class="pill sandbox">Sandbox</span>
+      <span class="org-host">acme--uat.sandbox.my.salesforce.com</span>
+    </div>
+  </section>
+  <section class="view active" style="display:block">
+    <div class="subnav">
+      <button type="button" class="subnav-btn active">Map</button>
+      <button type="button" class="subnav-btn">Field list</button>
+    </div>
+    <p class="lede">Search a record type. Tiles are objects; lines are lookups. Drag a tile to move it.</p>
+    <div class="schema-builder" style="display:block">
+      <div class="schema-builder-toolbar">
+        <span class="hint" style="margin:0">Drag a tile to move it · empty space pans the map</span>
+        <div class="row wrap" style="margin:0;gap:6px">
+          <button type="button" class="btn ghost active">Simple</button>
+          <button type="button" class="btn ghost">Permissions</button>
+        </div>
+      </div>
+      <p class="schema-story">Account is linked to Contact, Opportunity, and Case.</p>
+      <div class="schema-legend">
+        <span class="schema-legend-item"><i class="lg-lookup"></i> Linked to</span>
+        <span class="schema-legend-item"><i class="lg-md"></i> Must belong to (required parent)</span>
+      </div>
+      <div class="schema-builder-body">
+        <div class="schema-viewport">
+          <div class="schema-world">
+            <svg class="schema-lines" width="1200" height="500" xmlns="http://www.w3.org/2000/svg">
+              <path class="sb-line" d="M 430 150 C 500 150, 500 80, 590 90"></path>
+              <path class="sb-line" d="M 430 190 C 500 210, 500 260, 590 270"></path>
+              <path class="sb-line sb-line-md" d="M 150 170 C 80 250, 200 340, 300 360"></path>
+            </svg>
+            <div class="schema-cards">
+              <article class="sb-card is-center" style="left:150px;top:90px">
+                <div class="sb-card-head">
+                  <div class="sb-card-titles">
+                    <span class="sb-kind">Standard</span>
+                    <strong>Account</strong>
+                    <span class="sb-api">Account</span>
+                  </div>
+                </div>
+                <div class="sb-field is-rel"><span class="sb-field-name">Owner</span><span class="sb-field-type">Lookup</span></div>
+                <div class="sb-field"><span class="sb-field-name">Name</span><span class="sb-field-type">Text</span></div>
+                <div class="sb-field"><span class="sb-field-name">Industry</span><span class="sb-field-type">Picklist</span></div>
+              </article>
+              <article class="sb-card" data-role="child" style="left:590px;top:40px">
+                <div class="sb-card-head">
+                  <div class="sb-card-titles">
+                    <span class="sb-role-pill">Child</span>
+                    <span class="sb-kind">Standard</span>
+                    <strong>Contact</strong>
+                  </div>
+                </div>
+                <div class="sb-field is-rel"><span class="sb-field-name">Account</span><span class="sb-field-type">Lookup</span></div>
+                <div class="sb-field"><span class="sb-field-name">Email</span><span class="sb-field-type">Email</span></div>
+              </article>
+              <article class="sb-card" data-role="child" style="left:590px;top:230px">
+                <div class="sb-card-head">
+                  <div class="sb-card-titles">
+                    <span class="sb-role-pill">Child</span>
+                    <span class="sb-kind">Standard</span>
+                    <strong>Opportunity</strong>
+                  </div>
+                </div>
+                <div class="sb-field is-rel"><span class="sb-field-name">Account</span><span class="sb-field-type">Lookup</span></div>
+                <div class="sb-field"><span class="sb-field-name">Amount</span><span class="sb-field-type">Currency</span></div>
+              </article>
+              <article class="sb-card kind-custom" style="left:300px;top:330px">
+                <div class="sb-card-head">
+                  <div class="sb-card-titles">
+                    <span class="sb-kind">Custom</span>
+                    <strong>Subscription</strong>
+                    <span class="sb-api">Subscription__c</span>
+                  </div>
+                </div>
+                <div class="sb-field is-rel"><span class="sb-field-name">Account</span><span class="sb-field-type">Master-Detail</span></div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</body>
+</html>

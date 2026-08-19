@@ -1,6 +1,6 @@
 ================================================================================
 Chrome Web Store — OrgKit listing copy (paste into Developer Dashboard)
-Version covered: 1.10.0
+Version covered: 1.11.0
 ================================================================================
 
 LANGUAGE
@@ -14,26 +14,25 @@ CATEGORY
 SHORT DESCRIPTION  (max 132 characters — count carefully)
 ================================================================================
 
-Daily Salesforce work: Query, Schema, Compare, Apex. Uses your open tab session only.
+Query, schema, compare, and Apex in the Salesforce org already open in Chrome. Tab session only.
 
-Character count: 85
+Character count: 96
 
 ================================================================================
 DETAILED DESCRIPTION
 ================================================================================
 
-OrgKit is for the Salesforce work you already do in Chrome.
+OrgKit is four tools for the Salesforce org already open in Chrome.
 
 You stay in the org you logged into. OrgKit uses that tab session — it does not ask for a password and does not store your session id.
 
-Daily tools
+What you use
 • Query — describe the rows in plain English, or run SOQL / Tooling
-• Schema — a map of how record types connect, plus a field describe
-• Compare — UAT vs Prod (objects, permissions, live flow versions) or any two flow versions in the same org or across two orgs
+• Schema — a map of how record types connect, plus a field list
+• Compare — UAT vs Prod (objects, permissions, live flow versions) or any two flow versions
 • Apex — anonymous Apex and debug output
-• Home — continue recent work, pinned queries, a per-org scratch pad
 
-Also available under More: inactive flow versions, package.xml, permissions, metadata jump, record Ids, and heuristic scans for pasted logs/errors/Apex.
+Home shows those four tools first. Recent work and a scratch pad stay folded underneath. Extra paste tools live under More.
 
 How authentication works
 OrgKit does not ask you to type a password into the extension. It uses the Salesforce session cookie from a Salesforce tab you already logged into in Chrome, only to call Salesforce APIs for actions you start. The session stays in your browser. This is the same session model used by tools such as Salesforce Inspector Reloaded.
@@ -57,7 +56,7 @@ Permissions (summary)
 SINGLE PURPOSE
 ================================================================================
 
-OrgKit lets Salesforce developers do daily work in the org already open in Chrome: query data, read schema, compare two orgs or flow versions, and run anonymous Apex — using the browser Salesforce session from a logged-in tab.
+OrgKit lets Salesforce developers query data, read schema, compare two orgs or flow versions, and run anonymous Apex in the org already open in Chrome, using the browser Salesforce session from a logged-in tab.
 
 ================================================================================
 PUBLIC URLS (Chrome Web Store — OrgKit)

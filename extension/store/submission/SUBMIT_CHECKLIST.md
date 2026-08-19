@@ -1,34 +1,35 @@
-# OrgKit — Chrome Web Store submit checklist (v1.8.8)
+# OrgKit — Chrome Web Store submit checklist (v1.11.0)
 
 ## 1. Upload package (required)
 
-- [ ] Upload **`OrgKit-store.zip`** (or `OrgKit-1.8.8-store.zip`) — manifest at zip root
-- [ ] Confirm version **1.8.8**
+- [ ] Upload **`OrgKit-store.zip`** (or `OrgKit-1.11.0-store.zip`) — manifest at zip root
+- [ ] Confirm version **1.11.0**
 - [ ] Confirm permissions: **cookies** + **storage** + **tabs** (+ Salesforce hosts; OpenAI optional)
 - [ ] Confirm UI entry is `app/index.html`
+- [ ] Light Lightning / Flow theme (white cards, `#0176d3`) — not the old dark navy console
 
 ## 2. Store listing (required)
 
 - [ ] Item name: **OrgKit**
 - [ ] Paste short + detailed description from `LISTING_COPY.txt`
 - [ ] Category: **Productivity** · Language: **English (United States)**
-- [ ] Homepage / Support / Privacy URLs from `STORE_LISTING_URLS.txt` (OrgKit-branded; not orgcomparision)
+- [ ] Homepage / Support / Privacy URLs from `STORE_LISTING_URLS.txt` (OrgKit-branded)
 - [ ] Privacy policy URL: `https://rajeevketha.github.io/orgkit/privacy.html`
-- [ ] Icon: `icons/icon-128.png`
-- [ ] Screenshots: at least one `screenshots/*-1280x800.png` (prefer 1280×800 or 640×400)
+- [ ] Icon: `extension/icons/icon128.png`
+- [ ] Screenshots (1280×800): `screenshots/home-1280x800.png`, `query-1280x800.png`, `schema-1280x800.png`
 - [ ] Optional promo: `promo/small-promo-440x280.png`, `promo/marquee-promo-1400x560.png`
 
 ## 3. Permissions / privacy (required)
 
-- [ ] Paste from `PERMISSION_JUSTIFICATIONS.txt` (cookies, storage, hosts, optional OpenAI)
+- [ ] Paste from `PERMISSION_JUSTIFICATIONS.txt` (cookies, storage, tabs, hosts, optional OpenAI)
 - [ ] Single purpose from `LISTING_COPY.txt`
 - [ ] Privacy practices from `PRIVACY_QUESTIONNAIRE.txt`
-- [ ] Reviewer notes: `proofs/REVIEWER_NOTES.txt` (optional but helpful)
+- [ ] Reviewer notes: `proofs/REVIEWER_NOTES.txt`
 
 ## 4. Pre-flight before “Submit for review”
 
 - [ ] Privacy URL opens in Incognito
-- [ ] Load `OrgKit-store.zip` unpacked locally → Session connected on a Salesforce tab
-- [ ] Workbench home loads; Org Compare lists sessions; SOQL runs; Describe works
+- [ ] Load `OrgKit-store.zip` unpacked locally → session connected on a Salesforce tab
+- [ ] Home shows four tools (Query, Schema, Compare, Apex); Query generates SOQL; Schema map loads; Compare lists sessions
 - [ ] Opens as `chrome-extension://…/app/index.html`
 - [ ] Submit for review

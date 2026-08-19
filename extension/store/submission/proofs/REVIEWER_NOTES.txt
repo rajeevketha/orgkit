@@ -1,13 +1,13 @@
 ================================================================================
-Notes for Chrome Web Store reviewers — OrgKit 1.8.3
+Notes for Chrome Web Store reviewers — OrgKit 1.11.0
 ================================================================================
 
 Single purpose
 --------------
 OrgKit is a Salesforce developer productivity extension. It helps users work in an
-org they already logged into in Chrome (SOQL/Tooling, describe/metadata including
-custom objects, dual-org Org Compare, Apex/flow helpers). It is not a general web
-scraper, ad tool, or credential harvester.
+org they already logged into in Chrome: Query (plain English or SOQL), Schema map,
+Org Compare (two orgs or two flow versions), and anonymous Apex. Extra helpers sit
+under More. It is not a general web scraper, ad tool, or credential harvester.
 
 Session model (aligned with Salesforce Inspector Reloaded)
 ----------------------------------------------------------
@@ -22,7 +22,7 @@ sid; only remembers last A/B org keys locally if the user used Org Compare.
 
 Lean permissions
 ----------------
-Required: cookies, storage.
+Required: cookies, storage, tabs.
 Host permissions: Salesforce domains only.
 Optional: OpenAI hosts if the user enables AI.
 Requests tabs only to list open Salesforce org/sandbox sessions across windows.
@@ -31,6 +31,8 @@ Does NOT request activeTab or scripting.
 UI entry point
 --------------
 Full-tab UI: app/index.html (legacy popup/popup.html redirects here).
+Light Lightning / Flow theme (white cards, Salesforce blue). Home highlights the
+four daily tools.
 
 Privacy policy
 --------------
@@ -42,10 +44,11 @@ How to test
 2. Sign in to a Salesforce sandbox / Developer Edition (optionally a second org in
    another tab or Chrome window).
 3. Open OrgKit from the toolbar (or Alt+Shift+O).
-4. Confirm Session: connected; home shows Session Workbench.
-5. SOQL on a standard or custom object; Describe search by label/API name.
-6. Org Compare → Refresh sessions → Set as A / Set as B → Compare (objects/profiles).
-7. On-page OrgKit tab Hide → Show restores it.
+4. Confirm Session: connected; Home shows Query / Schema / Compare / Apex.
+5. Query: generate SOQL from a plain-English prompt and run it.
+6. Schema: search Account (or a custom object) and confirm tiles + lines.
+7. Org Compare → Refresh sessions → Set as A / Set as B → Compare.
+8. On-page OrgKit tab Hide → Show restores it.
 
 Destructive actions require confirmation. Active flow versions are never deleted
-by the cleaner. Screenshots use fictional demo org data.
+by the cleaner. Screenshots use fictional demo org data (acme--uat).

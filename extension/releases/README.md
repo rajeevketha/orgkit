@@ -10,9 +10,16 @@
 **GitHub raw (this branch):**
 
 - Store: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-store.zip
-- Versioned: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-1.10.0-store.zip
+- Versioned: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-1.11.0-store.zip
 
-## Current version: 1.10.0
+## Current version: 1.11.0
+
+### 1.11.0 notes
+
+- One light Lightning / Flow theme across the app, settings, and Salesforce edge tab
+- Home states the product in one line and shows four tools: Query, Schema, Compare, Apex
+- Scratch pad and privacy sit under folds so the home screen stays simple
+- Chrome Web Store screenshots, promo tiles, and listing copy updated for 1.11.0
 
 ### 1.10.0 notes
 
