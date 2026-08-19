@@ -11,6 +11,7 @@
 | Privacy questionnaire | `PRIVACY_QUESTIONNAIRE.txt` |
 | Privacy page (also hosted) | `privacy.html` + https://rajeevketha.github.io/orgkit/privacy.html |
 | Reviewer notes | `proofs/REVIEWER_NOTES.txt` |
+| **Open these images in a browser** | [`../../../cws-uploads/`](../../../cws-uploads/) · https://rajeevketha.github.io/orgkit/cws-uploads/ |
 | Screenshots | `screenshots/home-1280x800.png`, `query-1280x800.png`, `schema-1280x800.png`, `compare-1280x800.png` |
 | Optional screenshot | `screenshots/launcher-1280x800.png` |
 | Promo | `promo/small-promo-440x280.png`, `promo/marquee-promo-1400x560.png` |

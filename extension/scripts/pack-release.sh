@@ -133,12 +133,42 @@ if [[ -d "$ART" ]]; then
 <html lang="en"><head><meta charset="utf-8"><title>OrgKit ${VERSION} Chrome Web Store pack</title></head>
 <body style="font:16px/1.45 system-ui,sans-serif;max-width:42rem;margin:2rem auto;padding:0 1rem">
   <h1>OrgKit ${VERSION} listing pack</h1>
-  <p>Store upload zip + dark-theme screenshots, promo tiles, store icon, and paste copy.</p>
-  <p><a href="https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-CWS-listing.zip">Download listing bundle from GitHub</a></p>
-  <p>Upload zip only: <a href="https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-store.zip">OrgKit-store.zip</a></p>
-  <p>If Files hides zip files, download <code>Download-OrgKit-CWS-listing-${VERSION}.tgz</code> from this folder, then extract it.</p>
+  <p><strong>Icons and screenshots are not inside OrgKit-store.zip.</strong> Open the graphics page:</p>
+  <p><a href="cws-uploads/index.html">Open icon + screenshot gallery</a></p>
+  <p>GitHub folder (each PNG is visible): <a href="https://github.com/rajeevketha/orgkit/tree/cursor/highlight-nl-soql-1d8c/cws-uploads">cws-uploads</a></p>
+  <p>Live page: <a href="https://rajeevketha.github.io/orgkit/cws-uploads/">https://rajeevketha.github.io/orgkit/cws-uploads/</a></p>
+  <p>If Files hides zip files, download <code>Download-CWS-uploads.tgz</code> or <code>Download-OrgKit-CWS-listing-${VERSION}.tgz</code>.</p>
 </body></html>
 HTML
+fi
+
+# Browseable PNG gallery (GitHub + Files). Do not put these images inside the extension zip.
+bash "$ROOT/extension/scripts/publish-cws-uploads.sh" "$ROOT/cws-uploads"
+if [[ -d "$ART" ]]; then
+  bash "$ROOT/extension/scripts/publish-cws-uploads.sh" "$ART/cws-uploads"
+  (cd "$ART/cws-uploads" && tar -czf "$ART/Download-CWS-uploads.tgz" .)
+  cp -f "$ART/cws-uploads/index.html" "$ART/Chrome-Web-Store-uploads.html"
+  # Root HTML must point at the subfolder so images still load from Files.
+  python3 - <<'PY'
+from pathlib import Path
+p = Path("/opt/cursor/artifacts/Chrome-Web-Store-uploads.html")
+html = p.read_text()
+# Rewrite relative asset hrefs/src when this copy sits next to cws-uploads/
+for name in [
+    "OrgKit-store.zip",
+    "store-icon-128.png",
+    "01-home-1280x800.png",
+    "02-query-1280x800.png",
+    "03-schema-1280x800.png",
+    "04-compare-1280x800.png",
+    "05-launcher-1280x800.png",
+    "small-promo-440x280.png",
+    "marquee-promo-1400x560.png",
+]:
+    html = html.replace(f'href="{name}"', f'href="cws-uploads/{name}"')
+    html = html.replace(f'src="{name}"', f'src="cws-uploads/{name}"')
+p.write_text(html)
+PY
 fi
 
 # Write pointer for docs / agents.

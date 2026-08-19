@@ -14,3 +14,5 @@ sf-dev-toolkit-*.zip
 # Downloadable packages (Cursor Files zip UX is unreliable)
 !extension/releases/
 !extension/releases/**/*.zip
+!cws-uploads/
+!cws-uploads/**/*.zip
