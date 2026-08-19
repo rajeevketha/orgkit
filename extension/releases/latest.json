@@ -3,5 +3,7 @@
   "storeZip": "OrgKit-store.zip",
   "storeZipVersioned": "OrgKit-1.12.1-store.zip",
   "testingZip": "OrgKit-1.12.1-for-testing.zip",
-  "currentZip": "OrgKit-CURRENT.zip"
+  "currentZip": "OrgKit-CURRENT.zip",
+  "listingZip": "OrgKit-CWS-listing.zip",
+  "listingZipVersioned": "OrgKit-CWS-listing-1.12.1.zip"
 }

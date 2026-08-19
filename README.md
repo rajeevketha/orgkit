@@ -35,7 +35,8 @@ Inactive flow versions, package.xml, permissions, metadata jump, record/ID tools
 ## Chrome Web Store pack
 
 - Upload zip: [`extension/releases/OrgKit-store.zip`](extension/releases/OrgKit-store.zip)
-- Listing copy + screenshots: [`extension/store/submission/`](extension/store/submission/)
+- Listing copy + screenshots + promo: [`extension/store/submission/`](extension/store/submission/)
+- Full listing bundle: [`extension/releases/OrgKit-CWS-listing.zip`](extension/releases/OrgKit-CWS-listing.zip)
 - Rebuild: `bash extension/scripts/pack-release.sh`
 
 ## License

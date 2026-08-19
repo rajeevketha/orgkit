@@ -11,6 +11,7 @@
 
 - Store: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-store.zip
 - Versioned: https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-1.12.1-store.zip
+- Listing pack (screenshots + promo + paste copy): https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-CWS-listing.zip
 
 ## Current version: 1.12.1
 
@@ -18,6 +19,7 @@
 
 - Tab favicon and header use the same abstract K files (new filenames so Chrome drops the old OK cache)
 - Toolbar icon is applied on install/startup
+- Chrome Web Store screenshots, dark promo tiles, and listing copy for 1.12.1
 
 ### 1.12.0 notes
 

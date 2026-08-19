@@ -21,24 +21,23 @@ Mature content
   Off
 
 ================================================================================
-ONE-TIME SETUP (do this before submit — makes URLs say "orgkit")
+GITHUB PAGES (must match the listing before you submit)
 ================================================================================
 
-1) Rename GitHub repo to orgkit
-   Open: https://github.com/rajeevketha/orgcomparision/settings
-   → Repository name → change to: orgkit → Rename
+Chrome Web Store reviewers open the homepage and privacy URLs. They must describe
+the current product (Query / Schema / Compare / Apex), not the old Session Workbench copy.
 
-2) Enable GitHub Pages
-   Open: https://github.com/rajeevketha/orgkit/settings/pages
-   → Build and deployment → Deploy from a branch
-   → Branch: main (or cursor/orgkit-org-compare-2ff7 if not merged yet)
-   → Folder: / (root)
-   → Save
+GitHub Pages for this repo is currently set to branch:
+  cursor/orgkit-org-compare-2ff7   folder: /
 
-3) Wait 1–2 minutes, then verify in Incognito:
-   https://rajeevketha.github.io/orgkit/
-   https://rajeevketha.github.io/orgkit/privacy.html
+After this PR is merged, switch Pages to `main` (folder /) in:
+  https://github.com/rajeevketha/orgkit/settings/pages
 
-4) Paste the URLs above into the Chrome Web Store listing and Save draft.
+Until then, the homepage files on that Pages branch must stay in sync with this
+branch’s `index.html` and `privacy.html`.
+
+Verify in Incognito before submit:
+  https://rajeevketha.github.io/orgkit/
+  https://rajeevketha.github.io/orgkit/privacy.html
 
 Do NOT use chromeplugins or orgcomparision in the public store listing.

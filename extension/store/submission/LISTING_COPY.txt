@@ -1,6 +1,6 @@
 ================================================================================
 Chrome Web Store — OrgKit listing copy (paste into Developer Dashboard)
-Version covered: 1.12.0
+Version covered: 1.12.1
 ================================================================================
 
 LANGUAGE
@@ -76,4 +76,5 @@ Privacy policy URL
 
 Notes
   - Product name is OrgKit.
-  - Confirm privacy URL opens in Incognito before submit.
+  - Confirm privacy URL AND homepage open in Incognito before submit.
+  - Homepage copy must match this listing (Query / Schema / Compare / Apex). Do not submit while the live page still says Session Workbench.

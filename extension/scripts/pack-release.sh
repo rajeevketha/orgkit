@@ -59,6 +59,88 @@ if [[ -d "$ART" ]]; then
 HTML
 fi
 
+# Full Chrome Web Store listing bundle: upload zip + graphics + paste copy.
+LISTING="$TMP/listing"
+mkdir -p \
+  "$LISTING/1-UPLOAD-THIS" \
+  "$LISTING/2-GRAPHICS/screenshots" \
+  "$LISTING/2-GRAPHICS/promo" \
+  "$LISTING/3-PASTE"
+cp -f "$STORE_VER" "$LISTING/1-UPLOAD-THIS/OrgKit-store.zip"
+cp -f "$EXT/icons/orgkit-128.png" "$LISTING/2-GRAPHICS/store-icon-128.png"
+cp -f "$EXT/store/submission/screenshots/home-1280x800.png" "$LISTING/2-GRAPHICS/screenshots/01-home-1280x800.png"
+cp -f "$EXT/store/submission/screenshots/query-1280x800.png" "$LISTING/2-GRAPHICS/screenshots/02-query-1280x800.png"
+cp -f "$EXT/store/submission/screenshots/schema-1280x800.png" "$LISTING/2-GRAPHICS/screenshots/03-schema-1280x800.png"
+cp -f "$EXT/store/submission/screenshots/compare-1280x800.png" "$LISTING/2-GRAPHICS/screenshots/04-compare-1280x800.png"
+cp -f "$EXT/store/submission/screenshots/launcher-1280x800.png" "$LISTING/2-GRAPHICS/screenshots/05-launcher-1280x800.png"
+cp -f "$EXT/store/submission/promo/small-promo-440x280.png" "$LISTING/2-GRAPHICS/promo/"
+cp -f "$EXT/store/submission/promo/marquee-promo-1400x560.png" "$LISTING/2-GRAPHICS/promo/"
+cp -f \
+  "$EXT/store/submission/LISTING_COPY.txt" \
+  "$EXT/store/submission/PERMISSION_JUSTIFICATIONS.txt" \
+  "$EXT/store/submission/PRIVACY_QUESTIONNAIRE.txt" \
+  "$EXT/store/submission/STORE_LISTING_URLS.txt" \
+  "$EXT/store/submission/SUBMIT_CHECKLIST.md" \
+  "$EXT/store/submission/proofs/REVIEWER_NOTES.txt" \
+  "$LISTING/3-PASTE/"
+cat > "$LISTING/READ_ME_FIRST.txt" <<TXT
+OrgKit ${VERSION} — Chrome Web Store resubmit pack
+=================================================
+
+1) Package
+   Upload 1-UPLOAD-THIS/OrgKit-store.zip
+   (manifest.json is at the zip root. Version ${VERSION}.)
+
+2) Store icon
+   2-GRAPHICS/store-icon-128.png
+   Abstract K on a dark tile. Replace any leftover blue OK / briefcase icon.
+
+3) Screenshots (1280×800) — upload in this order
+   01-home, 02-query, 03-schema, 04-compare
+   05-launcher is optional (dark OrgKit edge tab on a Salesforce page).
+   Do not keep old light-theme screenshots in the listing.
+
+4) Promo tiles — replace the old light Lightning tiles
+   small-promo-440x280.png
+   marquee-promo-1400x560.png
+
+5) Paste from 3-PASTE/
+   LISTING_COPY.txt              short + detailed + single purpose
+   PERMISSION_JUSTIFICATIONS.txt cookies / storage / tabs / hosts
+   PRIVACY_QUESTIONNAIRE.txt     data safety answers
+   REVIEWER_NOTES.txt            reviewer notes field
+   STORE_LISTING_URLS.txt        homepage / support / privacy
+
+6) Before Submit for review
+   Incognito-check:
+     https://rajeevketha.github.io/orgkit/
+     https://rajeevketha.github.io/orgkit/privacy.html
+   Homepage must say Query / Schema / Compare / Apex (not Session Workbench).
+TXT
+
+LISTING_VER="$REL/OrgKit-CWS-listing-${VERSION}.zip"
+LISTING_STABLE="$REL/OrgKit-CWS-listing.zip"
+rm -f "$LISTING_VER" "$LISTING_STABLE"
+(cd "$LISTING" && zip -r -q "$LISTING_VER" .)
+cp -f "$LISTING_VER" "$LISTING_STABLE"
+
+if [[ -d "$ART" ]]; then
+  cp -f "$LISTING_VER" "$ART/OrgKit-CWS-listing-${VERSION}.zip"
+  cp -f "$LISTING_STABLE" "$ART/OrgKit-CWS-listing.zip"
+  (cd "$LISTING" && tar -czf "$ART/Download-OrgKit-CWS-listing-${VERSION}.tgz" .)
+  cat > "$ART/Download-OrgKit-CWS-listing-${VERSION}.html" <<HTML
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>OrgKit ${VERSION} Chrome Web Store pack</title></head>
+<body style="font:16px/1.45 system-ui,sans-serif;max-width:42rem;margin:2rem auto;padding:0 1rem">
+  <h1>OrgKit ${VERSION} listing pack</h1>
+  <p>Store upload zip + dark-theme screenshots, promo tiles, store icon, and paste copy.</p>
+  <p><a href="https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-CWS-listing.zip">Download listing bundle from GitHub</a></p>
+  <p>Upload zip only: <a href="https://github.com/rajeevketha/orgkit/raw/cursor/highlight-nl-soql-1d8c/extension/releases/OrgKit-store.zip">OrgKit-store.zip</a></p>
+  <p>If Files hides zip files, download <code>Download-OrgKit-CWS-listing-${VERSION}.tgz</code> from this folder, then extract it.</p>
+</body></html>
+HTML
+fi
+
 # Write pointer for docs / agents.
 cat > "$REL/latest.json" <<EOF
 {
@@ -66,11 +148,14 @@ cat > "$REL/latest.json" <<EOF
   "storeZip": "OrgKit-store.zip",
   "storeZipVersioned": "OrgKit-${VERSION}-store.zip",
   "testingZip": "OrgKit-${VERSION}-for-testing.zip",
-  "currentZip": "OrgKit-CURRENT.zip"
+  "currentZip": "OrgKit-CURRENT.zip",
+  "listingZip": "OrgKit-CWS-listing.zip",
+  "listingZipVersioned": "OrgKit-CWS-listing-${VERSION}.zip"
 }
 EOF
 
 echo "Packed OrgKit ${VERSION}"
 echo "  Store (upload to CWS): $STORE_VER"
+echo "  Listing bundle:        $LISTING_VER"
 echo "  Stable default:        $STORE_STABLE"
-ls -la "$STORE_VER" "$STORE_STABLE" "$CURRENT"
+ls -la "$STORE_VER" "$STORE_STABLE" "$CURRENT" "$LISTING_VER"

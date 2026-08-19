@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>OrgKit on-page tab</title>
+  <link rel="stylesheet" href="../../../content/content.css" />
+  <style>
+    html, body { width: 1280px; height: 800px; margin: 0; overflow: hidden; }
+    body {
+      font: 14px/1.4 "Inter", "Segoe UI", system-ui, sans-serif;
+      background: #f3f3f3;
+      color: #181818;
+    }
+    .sf-top {
+      height: 50px;
+      background: #1b5297;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .sf-body { display: flex; height: 750px; }
+    .sf-nav {
+      width: 220px;
+      background: #fff;
+      border-right: 1px solid #dddbda;
+      padding: 16px 14px;
+      color: #444;
+    }
+    .sf-nav div { padding: 8px 10px; border-radius: 4px; }
+    .sf-nav div.active { background: #ecebea; font-weight: 700; color: #181818; }
+    .sf-main { flex: 1; padding: 28px 32px; }
+    h1 { margin: 0 0 8px; font-size: 22px; color: #032d60; }
+    p { color: #54698d; max-width: 36em; }
+  </style>
+</head>
+<body>
+  <div class="sf-top">Salesforce Setup · Demo Org (Sandbox)</div>
+  <div class="sf-body">
+    <aside class="sf-nav">
+      <div class="active">Home</div>
+      <div>Object Manager</div>
+      <div>Flows</div>
+      <div>Apex Classes</div>
+    </aside>
+    <main class="sf-main">
+      <h1>Setup Home</h1>
+      <p>The OrgKit tab on the right edge opens Query, Schema, Compare, and Apex in the org already open in this tab.</p>
+    </main>
+  </div>
+  <button type="button" class="orgkit-side-tab is-open" aria-label="OrgKit"><span>OrgKit</span></button>
+  <div class="orgkit-side-panel">
+    <button type="button" data-action="orgkit">Open OrgKit</button>
+    <button type="button">Query</button>
+    <button type="button">Schema</button>
+    <button type="button">Compare</button>
+    <button type="button">Apex</button>
+    <button type="button" class="orgkit-muted">Hide</button>
+  </div>
+</body>
+</html>
